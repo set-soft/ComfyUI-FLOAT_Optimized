@@ -14,6 +14,7 @@ from .generator import Generator
 from .FMT import FlowMatchingTransformer
 import time
 
+from tqdm import tqdm
 from comfy.utils import ProgressBar
 
 ######## Main Phase 2 model ########		
@@ -58,24 +59,76 @@ class FLOAT(BaseModel):
 
 	@torch.no_grad()
 	def decode_latent_into_image(self, s_r: torch.Tensor , s_r_feats: list, r_d: torch.Tensor) -> dict:
-		# print("starting decoding")
-		# start = time.time()
-		
+		# This is the original code as reference
 		T = r_d.shape[1]
-		pbar = ProgressBar(T) # only for decoding latents, encoding + inference is pretty fast
 		d_hat = []
 		for t in range(T):
 			s_r_d_t = s_r + r_d[:, t]
 			img_t, _ = self.motion_autoencoder.dec(s_r_d_t, alpha = None, feats = s_r_feats)
 			d_hat.append(img_t)
-			pbar.update(1)
 		d_hat = torch.stack(d_hat, dim=1).squeeze()
-		# end = time.time()
-		
-		# print(end-start, "decoding done")
 
 		return {'d_hat': d_hat}
 
+	@torch.no_grad()
+	def decode_latent_into_processed_images(self, s_r: torch.Tensor, s_r_feats: list, r_d: torch.Tensor) -> torch.Tensor:
+		# More efficient decoder to enable longer videos
+		# Moves the frames from VRAM to RAM and arranges them in the final shape
+		# Gemini 2.5 Pro transformation
+		# Assumptions:
+		# 1. Effective batch size (B) for decoded images is 1.
+		# 2. T (number of frames from r_d.shape[1]) > 0.
+		#
+		# Returns:
+		# - Shape: (T, H, W, C)
+		# - Dtype: torch.float32 (or original float type)
+		# - Range: [0, 1]
+		# - Device: CPU
+
+		T = r_d.shape[1]  # Number of frames/images, assumed > 0
+
+		# Decode the first frame (t=0) to determine C, H, W and dtype
+		# s_r and r_d[:,0] combine to form input for one "item" if s_r is (Z) or (1,Z)
+		# and r_d is (T,Z) or (1,T,Z)
+		s_r_d_0 = s_r + r_d[:, 0]  # Assuming this results in an effective (1, Z_dim) input to dec
+								   # or that s_r and r_d are already shaped for B=1 processing.
+
+		# img_0_gpu will be (1, C, H, W) based on our B=1 assumption for the output of dec
+		img_0_gpu, _ = self.motion_autoencoder.dec(s_r_d_0, alpha=None, feats=s_r_feats)
+
+		_batch_dim_size, C, H, W = img_0_gpu.shape
+		assert _batch_dim_size == 1, "Decoder output batch size was not 1 as assumed"
+
+		# Pre-allocate the final output tensor on CPU.
+		# Target shape for output: (T, H, W, C)
+		final_images_thwc_shape = (T, H, W, C)
+		processed_images_tensor_cpu = torch.empty(final_images_thwc_shape, dtype=torch.float32, device='cpu')
+
+		pbar = ProgressBar(T)
+
+		# Process first frame (t=0)
+		# img_0_gpu is (1, C, H, W)
+		img_0_squeezed_gpu = img_0_gpu.squeeze(0)             # (C, H, W)
+		img_0_processed = img_0_squeezed_gpu.permute(1, 2, 0) # (H, W, C)
+		img_0_processed = img_0_processed.detach().clamp(-1, 1)
+		img_0_processed = ((img_0_processed + 1) / 2)
+		processed_images_tensor_cpu[0] = img_0_processed.cpu() # Assign to the T dimension
+		pbar.update(1)
+
+		# Loop through the rest of the frames (t=1 to T-1)
+		for t in tqdm(range(1, T), desc="Decoding Images"):
+			s_r_d_t = s_r + r_d[:, t]
+			# img_t_gpu will be (1, C, H, W)
+			img_t_gpu, _ = self.motion_autoencoder.dec(s_r_d_t, alpha=None, feats=s_r_feats)
+			# Process current frame
+			img_t_squeezed_gpu = img_t_gpu.squeeze(0)             # (C, H, W)
+			img_t_processed = img_t_squeezed_gpu.permute(1, 2, 0) # (H, W, C)
+			img_t_processed = img_t_processed.detach().clamp(-1, 1)
+			img_t_processed = ((img_t_processed + 1) / 2)
+			processed_images_tensor_cpu[t] = img_t_processed.cpu() # Assign to the T dimension
+			pbar.update(1)
+
+		return processed_images_tensor_cpu # Shape (T, H, W, C)
 
 	######## Motion Sampling and Inference ########
 	@torch.no_grad()
@@ -192,9 +245,8 @@ class FLOAT(BaseModel):
 		sample = self.sample(data, a_cfg_scale = a_cfg_scale, r_cfg_scale = r_cfg_scale, e_cfg_scale = e_cfg_scale, emo = emo, nfe = nfe, seed = seed)
 		# end = time.time()
 		# print(end-start, "actual inference")
-		data_out = self.decode_latent_into_image(s_r = s_r, s_r_feats = s_r_feats, r_d = sample)
 
-		return data_out
+		return self.decode_latent_into_processed_images(s_r = s_r, s_r_feats = s_r_feats, r_d = sample)
 
 
 

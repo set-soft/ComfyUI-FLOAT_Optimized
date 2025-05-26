@@ -270,16 +270,8 @@ class InferenceAgent:
 			emo 		= emo,
 			nfe			= nfe,
 			seed		= seed
-			)['d_hat']
-
-
-		# res_video_path = self.save_video(d_hat, res_video_path, audio_path)
-		# if verbose: print(f"> [Done] result saved at {res_video_path}")
-
-		images_bhwc = d_hat.squeeze(0).permute(0, 2, 3, 1)
-		images_bhwc = images_bhwc.detach().clamp(-1, 1).cpu()
-		images_bhwc = ((images_bhwc + 1) / 2) 
-		return images_bhwc
+			)
+		return d_hat
 
 
 # class InferenceOptions(BaseOptionsJson):
