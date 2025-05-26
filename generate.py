@@ -177,8 +177,6 @@ class DataProcessor:
 			speech_array, sampling_rate = comfy_audio_to_librosa_mono(path['waveform']), path['sample_rate']
 		else:
 			speech_array, sampling_rate = librosa.load(path, sr = self.sampling_rate)
-		print(speech_array)
-		print(sampling_rate)
 		return self.wav2vec_preprocessor(speech_array, sampling_rate = sampling_rate, return_tensors = 'pt').input_values[0]
 
 
