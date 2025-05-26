@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import Wav2Vec2Config, Wav2Vec2Model
-from transformers.modeling_outputs import BaseModelOutput
+# from transformers import Wav2Vec2Config, Wav2Vec2Model
+# from transformers.modeling_outputs import BaseModelOutput
 
 
 from torch import Tensor
