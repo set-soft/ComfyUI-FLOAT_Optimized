@@ -72,22 +72,12 @@ class FloatProcess:
     DESCRIPTION = "Float Processing"
 
     def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, r_cfg_scale, e_cfg_scale, fps, emotion, crop, seed):
-        temp_dir = folder_paths.get_temp_directory()
-        os.makedirs(temp_dir, exist_ok=True)
-
-        # save image
-        if ref_image.shape[0] != 1:
-            raise Exception("Only a single image is supported.")
-        ref_image_bchw = ref_image.permute(0, 3, 1, 2)
-        image_save_path = os.path.join(temp_dir, f"{int(time.time())}.png")
-        vutils.save_image(ref_image_bchw[0], image_save_path)
-        
         float_pipe.G.to(float_pipe.rank)
 
         float_pipe.opt.fps = fps
         images_bhwc = float_pipe.run_inference(
             None,
-            image_save_path,
+            ref_image,
             ref_audio,
             a_cfg_scale = a_cfg_scale,
             r_cfg_scale = r_cfg_scale,

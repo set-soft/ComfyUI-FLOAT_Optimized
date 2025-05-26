@@ -114,9 +114,62 @@ class DataProcessor:
 		crop_img = cv2.resize(crop_img, dsize = (self.input_size, self.input_size), interpolation = cv2.INTER_AREA if mult < 1. else cv2.INTER_CUBIC)
 		return crop_img
 
-	def default_img_loader(self, path) -> np.ndarray:
-		img = cv2.imread(path)
-		return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+	def default_img_loader(self, path_or_tensor: Union[str, torch.Tensor]) -> np.ndarray:
+		"""
+		Loads an image from a file path (str) or uses a pre-loaded ComfyUI image tensor.
+
+		Args:
+		    path_or_tensor (Union[str, torch.Tensor]):
+		        - If str: The file path to the image.
+		        - If torch.Tensor: A ComfyUI image tensor, typically in
+		          (B, H, W, C) or (H, W, C) format, float32, range [0,1], RGB.
+
+		Returns:
+		    np.ndarray: The image as a NumPy array in (H, W, C) format,
+		                uint8, range [0, 255], RGB.
+		"""
+		# Gemini 2.5 Pro adapted to support ComfyUI images
+		if isinstance(path_or_tensor, str):
+			# Original file loading logic
+			img = cv2.imread(path_or_tensor)
+			if img is None:
+				raise FileNotFoundError(f"Image not found or unable to read: {path_or_tensor}")
+			return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+		elif not isinstance(path_or_tensor, torch.Tensor):
+			raise TypeError(f"Input must be a file path (str) or a torch.Tensor, got {type(path_or_tensor)}")
+
+		# Ok, this is a ComfyUI tensor
+		comfy_image_tensor = path_or_tensor
+
+		# Ensure tensor is on CPU
+		if comfy_image_tensor.device.type != 'cpu':
+			comfy_image_tensor = comfy_image_tensor.cpu()
+
+		# Handle batch dimension and select the first image
+		# ComfyUI image tensors are typically (batch, height, width, channels)
+		if comfy_image_tensor.ndim == 4:
+			if comfy_image_tensor.shape[0] != 1:
+				print(f"Warning: Input tensor has batch_size {comfy_image_tensor.shape[0]}. "
+					  "default_img_loader is processing only the first image.")
+			img_tensor_hwc = comfy_image_tensor[0]  # Shape: (H, W, C)
+		elif comfy_image_tensor.ndim == 3:  # Assuming (H, W, C)
+			img_tensor_hwc = comfy_image_tensor
+		else:
+			raise ValueError(f"Unsupported tensor ndim: {comfy_image_tensor.ndim}. "
+								 "Expected 3 (H,W,C) or 4 (B,H,W,C).")
+
+		# Convert to NumPy array
+		# Tensor is assumed to be float32, range [0,1], and RGB channels
+		numpy_image = img_tensor_hwc.numpy()
+
+		# Scale from [0, 1] to [0, 255] and convert to uint8
+		# Using np.clip to ensure values are strictly within [0, 255] after scaling,
+		# as floating point inaccuracies might push values slightly out of [0,1].
+		numpy_image_scaled_uint8 = np.clip(numpy_image * 255.0, 0, 255).astype(np.uint8)
+
+		# The tensor is assumed to be RGB, and the target format is RGB.
+		return numpy_image_scaled_uint8
 
 	def default_aud_loader(self, path: Union[str, Dict]) -> torch.Tensor:
 		if isinstance(path, dict):
@@ -129,7 +182,7 @@ class DataProcessor:
 		return self.wav2vec_preprocessor(speech_array, sampling_rate = sampling_rate, return_tensors = 'pt').input_values[0]
 
 
-	def preprocess(self, ref_path:str, audio_path:Union[str, Dict], no_crop:bool) -> dict:
+	def preprocess(self, ref_path:Union[str, torch.Tensor], audio_path:Union[str, Dict], no_crop:bool) -> dict:
 		s = self.default_img_loader(ref_path)
 		if not no_crop:
 			s = self.process_img(s)
@@ -189,7 +242,7 @@ class InferenceAgent:
 	def run_inference(
 		self,
 		res_video_path: str,
-		ref_path: str,
+		ref_path: Union[str, torch.Tensor],
 		audio_path: Union[str, Dict],
 		a_cfg_scale: float	= 2.0,
 		r_cfg_scale: float	= 1.0,
