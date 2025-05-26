@@ -10,6 +10,7 @@ import albumentations as A
 import albumentations.pytorch.transforms as A_pytorch
 
 from tqdm import tqdm
+from comfy.utils import ProgressBar
 from pathlib import Path
 from transformers import Wav2Vec2FeatureExtractor
 
@@ -217,13 +218,16 @@ class InferenceAgent:
 	def load_weight(self, checkpoint_path: str, rank: int) -> None:
 		state_dict = torch.load(checkpoint_path, map_location='cpu', weights_only=True)
 		with torch.no_grad():
+			params = []
 			for model_name, model_param in self.G.named_parameters():
 				if model_name in state_dict:
-					model_param.copy_(state_dict[model_name].to(rank))
-				elif "wav2vec2" in model_name: pass
+					params.append((model_name, model_param))
 				else:
-					print(f"! Warning; {model_name} not found in state_dict.")
-
+					assert "wav2vec2" in model_name  # wav2vec2 layers aren't in float.pth
+			pbar = ProgressBar(len(params))
+			for model_name, model_param in tqdm(params, 'Loading weights'):
+				model_param.copy_(state_dict[model_name].to(rank))
+				pbar.update(1)
 		del state_dict
 
 	def save_video(self, vid_target_recon: torch.Tensor, video_path: str, audio_path: str) -> str:
