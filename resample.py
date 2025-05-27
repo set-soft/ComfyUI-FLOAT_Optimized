@@ -1,7 +1,8 @@
 # Audio resampler and mono conversion using librosa
 # Gemini 2.5 Pro code
-import numpy as np
 import librosa
+import numpy as np
+import torch
 
 
 def resample_audio_numpy(audio_data_numpy: np.ndarray, original_sr: int, target_sr: int,
