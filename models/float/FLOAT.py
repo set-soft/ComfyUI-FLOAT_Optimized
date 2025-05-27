@@ -165,18 +165,19 @@ class FLOAT(BaseModel):
 		else:
 			we = F.one_hot(torch.tensor(emo_idx, device = a.device), num_classes = self.opt.dim_e).unsqueeze(0).unsqueeze(0)
 
+		# If we want reproducible results create generator
+		if self.opt.fix_noise_seed:
+			g = torch.Generator(self.opt.rank)
+			g.manual_seed(self.opt.seed if seed is None else seed)
+		else:
+			g = None
+
 		sample = []
 		# sampling chunk by chunk
 		total_chunks = int(math.ceil(T / self.num_frames_for_clip))
 		iterable_chunks = tqdm(range(0, total_chunks), desc="Main inference (warm-up)", disable=not self.first_run)
 		for t in iterable_chunks:
-			if self.opt.fix_noise_seed:
-				seed = self.opt.seed if seed is None else seed	
-				g = torch.Generator(self.opt.rank)
-				g.manual_seed(seed)
-				x0 = torch.randn(B, self.num_frames_for_clip, self.opt.dim_w, device = self.opt.rank, generator = g)
-			else:
-				x0 = torch.randn(B, self.num_frames_for_clip, self.opt.dim_w, device = self.opt.rank)
+			x0 = torch.randn(B, self.num_frames_for_clip, self.opt.dim_w, device=self.opt.rank, generator=g)
 
 			if t == 0: # should define the previous
 				prev_x_t = torch.zeros(B, self.num_prev_frames, self.opt.dim_w).to(self.opt.rank)
