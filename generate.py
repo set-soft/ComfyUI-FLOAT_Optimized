@@ -2,7 +2,7 @@
 	Inference Stage 2
 """
 
-import os, torch, random, cv2, torchvision, subprocess, librosa, datetime, tempfile, face_alignment
+import os, torch, cv2, torchvision, librosa, face_alignment
 from typing import Union, Dict
 import numpy as np
 os.environ['NO_ALBUMENTATIONS_UPDATE'] = '1'  # Disable albumentations regretable behavior that checks internet
@@ -15,68 +15,7 @@ from pathlib import Path
 from transformers import Wav2Vec2FeatureExtractor
 
 from .models.float.FLOAT import FLOAT
-from .options.base_options import BaseOptions, BaseOptionsJson
-from .resample import resample_audio_numpy
-
-
-# Gemini 2.5 Pro code
-def comfy_audio_to_librosa_mono(comfy_audio_tensor: torch.Tensor, cur_sr: int, target_sr: int) -> np.ndarray:
-	"""
-	Converts a ComfyUI audio tensor to a mono NumPy array suitable for Librosa.
-
-	Args:
-	    comfy_audio_tensor (torch.Tensor):
-	        The input audio tensor from ComfyUI.
-	        Expected shape: (batch_size, channels, num_samples).
-	        Typically batch_size is 1.
-
-	Returns:
-	    np.ndarray:
-	        A mono audio waveform as a NumPy array with shape (num_samples,).
-	"""
-	if not isinstance(comfy_audio_tensor, torch.Tensor):
-		raise TypeError(f"Input must be a PyTorch Tensor, got {type(comfy_audio_tensor)}")
-
-	if comfy_audio_tensor.ndim != 3:
-		raise ValueError(
-			f"Expected a 3D tensor (batch_size, channels, num_samples), "
-			f"but got {comfy_audio_tensor.ndim}D tensor with shape {comfy_audio_tensor.shape}")
-
-	# 1. Handle batch dimension: Assume we process the first item if batch_size > 1
-	#    or just squeeze if batch_size is indeed 1.
-	if comfy_audio_tensor.shape[0] > 1:
-		print(f"Warning: Input tensor has batch_size {comfy_audio_tensor.shape[0]}. "
-			  "Processing only the first audio in the batch.")
-		audio_tensor = comfy_audio_tensor[0]  # Shape: (channels, num_samples)
-	else:
-		audio_tensor = comfy_audio_tensor.squeeze(0)  # Shape: (channels, num_samples)
-
-	# 2. Move to CPU (if it's on GPU) and convert to NumPy
-	#    Librosa operates on NumPy arrays on the CPU.
-	waveform_np = audio_tensor.cpu().numpy()  # Shape: (channels, num_samples)
-
-	# 3. Convert to mono if it's not already
-	#    waveform_np has shape (channels, num_samples)
-	#    librosa.to_mono expects a 2D array (channels, n_samples) or 1D (n_samples)
-	#    If it's already (1, num_samples), librosa.to_mono will correctly make it (num_samples,)
-	if waveform_np.ndim == 1: # Already mono (e.g. if squeeze(0) made it 1D from (1,1,N))
-		mono_waveform_np = waveform_np
-	elif waveform_np.shape[0] == 1: # Explicitly mono with channel dimension
-		mono_waveform_np = waveform_np[0, :]
-	elif waveform_np.shape[0] > 1: # Stereo or multi-channel
-		mono_waveform_np = librosa.to_mono(waveform_np)
-	else: # Should not happen if input validation is correct
-		raise ValueError(f"Unexpected waveform shape after processing: {waveform_np.shape}")
-
-	# Ensure it's float32, which librosa typically uses, though to_mono usually preserves float type.
-	if mono_waveform_np.dtype != np.float32:
-		mono_waveform_np = mono_waveform_np.astype(np.float32)
-
-	# Make the sample rate match the model training data, Wav2Vec needs 16k
-	if cur_sr != target_sr:
-		mono_waveform_np = resample_audio_numpy(mono_waveform_np, cur_sr, target_sr)
-
-	return mono_waveform_np
+from .resample import comfy_audio_to_librosa_mono
 
 
 class DataProcessor:
@@ -230,23 +169,6 @@ class InferenceAgent:
 				pbar.update(1)
 		del state_dict
 
-	def save_video(self, vid_target_recon: torch.Tensor, video_path: str, audio_path: str) -> str:
-		with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_video:
-			temp_filename = temp_video.name
-			vid = vid_target_recon.permute(0, 2, 3, 1)
-			vid = vid.detach().clamp(-1, 1).cpu()
-			vid = ((vid + 1) / 2 * 255).type('torch.ByteTensor')
-			torchvision.io.write_video(temp_filename, vid, fps=self.opt.fps)			
-			if audio_path is not None:
-				with open(os.devnull, 'wb') as f:
-					command =  "ffmpeg -i {} -i {} -c:v copy -c:a aac {} -y".format(temp_filename, audio_path, video_path)
-					subprocess.call(command, shell=True, stdout=f, stderr=f)
-				if os.path.exists(video_path):
-					os.remove(temp_filename)
-			else:
-				os.rename(temp_filename, video_path)
-			return video_path
-
 	@torch.no_grad()
 	def run_inference(
 		self,
@@ -263,7 +185,6 @@ class InferenceAgent:
 		verbose: bool 		= False
 	) -> str:
 		data = self.data_processor.preprocess(ref_path, audio_path, no_crop = no_crop)
-		# print(f"> [Done] Preprocess.")
 
 		# inference
 		d_hat = self.G.inference(
@@ -276,61 +197,3 @@ class InferenceAgent:
 			seed		= seed
 			)
 		return d_hat
-
-
-# class InferenceOptions(BaseOptionsJson):
-# 	def __init__(self):
-# 		super().__init__()
-
-	# def initialize(self, parser):
-	# 	super().initialize(parser)
-	# 	parser.add_argument("--ref_path",
-	# 			default=None, type=str,help='ref')
-	# 	parser.add_argument('--aud_path',
-	# 			default=None, type=str, help='audio')
-	# 	parser.add_argument('--emo',
-	# 			default=None, type=str, help='emotion', choices=['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise'])
-	# 	parser.add_argument('--no_crop',
-	# 			action = 'store_true', help = 'not using crop')
-	# 	parser.add_argument('--res_video_path',
-	# 			default=None, type=str, help='res video path')
-	# 	parser.add_argument('--ckpt_path',
-	# 			default="/home/nvadmin/workspace/taek/float-pytorch/checkpoints/float.pth", type=str, help='checkpoint path')
-	# 	parser.add_argument('--res_dir',
-	# 			default="./results", type=str, help='result dir')
-	# 	return parser
-
-
-# if __name__ == '__main__':
-# 	opt = InferenceOptions().parse()
-# 	opt.rank, opt.ngpus  = 0,1
-# 	agent = InferenceAgent(opt)
-# 	os.makedirs(opt.res_dir, exist_ok = True)
-
-# 	# -------------- input -------------
-# 	ref_path 		= opt.ref_path
-# 	aud_path 		= opt.aud_path
-# 	# ----------------------------------
-
-# 	if opt.res_video_path is None:
-# 		video_name = os.path.splitext(os.path.basename(ref_path))[0]
-# 		audio_name = os.path.splitext(os.path.basename(aud_path))[0]
-# 		call_time = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-# 		res_video_path = os.path.join(opt.res_dir, "%s-%s-%s-nfe%s-seed%s-acfg%s-ecfg%s-%s.mp4" \
-# 									% (call_time, video_name, audio_name, opt.nfe, opt.seed, opt.a_cfg_scale, opt.e_cfg_scale, opt.emo))
-# 	else:
-# 		res_video_path = opt.res_video_path
-
-	# agent.run_inference(
-	# 	res_video_path,
-	# 	ref_path,
-	# 	aud_path,
-	# 	a_cfg_scale = opt.a_cfg_scale,
-	# 	r_cfg_scale = opt.r_cfg_scale,
-	# 	e_cfg_scale = opt.e_cfg_scale,
-	# 	emo 		= opt.emo,
-	# 	nfe			= opt.nfe,
-	# 	no_crop 	= opt.no_crop,
-	# 	seed 		= opt.seed
-	# 	)
-
