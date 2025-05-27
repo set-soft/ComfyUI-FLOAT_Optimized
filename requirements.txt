@@ -3,3 +3,5 @@ librosa
 torchdiffeq
 timm>=1.0.9
 face_alignment
+transformers>=4
+tqdm

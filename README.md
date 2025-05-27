@@ -42,6 +42,10 @@ cd ./ComfyUI-FLOAT
 pip install -r requirements.txt
 ```
 
+Note:
+- The code uses `torch` which installed for ComfyUI, part of its dependencies.
+  This dependency isn't listed to avoid messing with it, which delicated.
+
 ## ☀️ Usage
 
 - Load [example workflow](float_workflow.json) 
