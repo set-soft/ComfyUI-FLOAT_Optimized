@@ -1,12 +1,10 @@
-import folder_paths
 import os
+import folder_paths
 import comfy.model_management as mm
-import time
-import torchaudio
-import torchvision.utils as vutils
 
 from .generate import InferenceAgent
 from .options.base_options import BaseOptionsJson
+
 
 class LoadFloatModels:
     @classmethod
@@ -62,6 +60,7 @@ class LoadFloatModels:
         agent = InferenceAgent(opt)
 
         return (agent,)
+
 
 class FloatProcess:
     @classmethod
