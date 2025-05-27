@@ -1,7 +1,4 @@
 opencv-python
-pandas
-matplotlib
-flow-vis
 librosa
 torchdiffeq
 timm>=1.0.9
