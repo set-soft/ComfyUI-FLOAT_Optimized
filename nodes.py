@@ -28,8 +28,24 @@ class LoadFloatModels:
         float_models_dir = os.path.join(folder_paths.models_dir, "float")
         os.makedirs(float_models_dir, exist_ok=True)
 
-        wav2vec2_base_960h_models_dir = os.path.join(float_models_dir,"wav2vec2-base-960h") 
-        wav2vec_english_speech_emotion_recognition_models_dir = os.path.join(float_models_dir,"wav2vec-english-speech-emotion-recognition") 
+        audio_models_dir = os.path.join(folder_paths.models_dir, "audio")
+
+        wav2vec2_base_960h_models_dir = os.path.join(float_models_dir,"wav2vec2-base-960h")
+        wav2vec_english_speech_emotion_recognition_models_dir = os.path.join(float_models_dir,"wav2vec-english-speech-emotion-recognition")
+
+        # Allow models/audio/wav2vec2-base-960h
+        if not os.path.isdir(wav2vec2_base_960h_models_dir):
+            alt_dir = os.path.join(audio_models_dir, "wav2vec2-base-960h")
+            if os.path.isdir(alt_dir):
+                wav2vec2_base_960h_models_dir = alt_dir
+                print("Using speach encoder from: "+alt_dir)
+        # Allow models/audio/wav2vec-english-speech-emotion-recognition
+        if not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir):
+            alt_dir = os.path.join(audio_models_dir, "wav2vec-english-speech-emotion-recognition")
+            if os.path.isdir(alt_dir):
+                wav2vec_english_speech_emotion_recognition_models_dir = alt_dir
+                print("Using emotion decoder from: "+alt_dir)
+
         float_model_path = os.path.join(float_models_dir,"float.pth")
 
         if not os.path.exists(float_model_path) or not os.path.isdir(wav2vec2_base_960h_models_dir) or not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir):
