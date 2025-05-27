@@ -5,9 +5,6 @@
 import os, torch, cv2, torchvision, librosa, face_alignment
 from typing import Union, Dict
 import numpy as np
-os.environ['NO_ALBUMENTATIONS_UPDATE'] = '1'  # Disable albumentations regretable behavior that checks internet
-import albumentations as A
-import albumentations.pytorch.transforms as A_pytorch
 
 from tqdm import tqdm
 from comfy.utils import ProgressBar
@@ -16,6 +13,19 @@ from transformers import Wav2Vec2FeatureExtractor
 
 from .models.float.FLOAT import FLOAT
 from .resample import comfy_audio_to_librosa_mono
+
+
+class CustomTransform:
+	# Image transformation to input size, normalized in CHW format
+	def __init__(self, input_size):
+		self.input_size = input_size
+
+	def __call__(self, image_np):
+		resized_image = cv2.resize(image_np, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
+		img_float = resized_image.astype(np.float32)
+		normalized_image = (img_float / 127.5) - 1.0
+		tensor_image = torch.from_numpy(normalized_image.transpose((2, 0, 1)))
+		return tensor_image
 
 
 class DataProcessor:
@@ -31,11 +41,7 @@ class DataProcessor:
 		self.wav2vec_preprocessor = Wav2Vec2FeatureExtractor.from_pretrained(opt.wav2vec_model_path, local_files_only=True)
 
 		# image transform 
-		self.transform = A.Compose([
-				A.Resize(height=opt.input_size, width=opt.input_size, interpolation=cv2.INTER_AREA),
-				A.Normalize(mean=(0.5,0.5,0.5), std=(0.5,0.5,0.5)),
-				A_pytorch.ToTensorV2(),
-			])
+		self.transform = CustomTransform(opt.input_size)
 
 	@torch.no_grad()
 	def process_img(self, img:np.ndarray) -> np.ndarray:
@@ -131,7 +137,7 @@ class DataProcessor:
 		s = self.default_img_loader(ref_path)
 		if not no_crop:
 			s = self.process_img(s)
-		s = self.transform(image=s)['image'].unsqueeze(0)
+		s = self.transform(s).unsqueeze(0)
 		a = self.default_aud_loader(audio_path).unsqueeze(0)
 		return {'s': s, 'a': a, 'p': None, 'e': None}
 
