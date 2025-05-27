@@ -1,5 +1,7 @@
 import math, torch
 import numpy as np
+from tqdm.auto import tqdm
+from comfy.utils import ProgressBar
 
 from torch import nn
 from torch.nn import functional as F
@@ -225,13 +227,16 @@ class EncoderApp(nn.Module):
 
 		self.convs.append(EqualConv2d(in_channel, self.w_dim, 4, padding=0, bias=False))
 
-	def forward(self, x):
+	def forward(self, x, pbar=None):
 
 		res = []
 		h = x
-		for conv in self.convs:
+		iterable_convs = tqdm(self.convs, desc="Encoding image (warm-up)", total=len(self.convs), disable=pbar is None)
+		for conv in iterable_convs:
 			h = conv(h)
 			res.append(h)
+			if pbar is not None:
+				pbar.update(1)
 
 		return res[-1].squeeze(-1).squeeze(-1), res[::-1][2:]
 
@@ -264,12 +269,12 @@ class Encoder(nn.Module):
 
 		return h_motion
 
-	def forward(self, input_source, input_target, h_start=None):
+	def forward(self, input_source, input_target, h_start=None, pbar=None):
 
 		if input_target is not None:
 
-			h_source, feats = self.net_app(input_source)
-			h_target, _ = self.net_app(input_target)
+			h_source, feats = self.net_app(input_source, pbar)
+			h_target, _ = self.net_app(input_target, pbar)
 
 			h_motion_target = self.fc(h_target)
 
@@ -281,6 +286,6 @@ class Encoder(nn.Module):
 
 			return h_source, h_motion, feats
 		else:
-			h_source, feats = self.net_app(input_source)
+			h_source, feats = self.net_app(input_source, pbar)
 
 			return h_source, None, feats

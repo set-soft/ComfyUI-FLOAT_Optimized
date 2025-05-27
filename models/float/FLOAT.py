@@ -22,6 +22,8 @@ class FLOAT(BaseModel):
 	def __init__(self, opt):
 		super().__init__()
 		self.opt = opt
+		self.first_run = True
+		pbar = ProgressBar(4)
 
 		self.num_frames_for_clip = int(self.opt.wav2vec_sec * self.opt.fps)
 		self.num_prev_frames = int(self.opt.num_prev_frames)
@@ -29,13 +31,17 @@ class FLOAT(BaseModel):
 		# motion latent auto-encoder
 		self.motion_autoencoder = Generator(size = opt.input_size, style_dim = opt.dim_w, motion_dim = opt.dim_m)
 		self.motion_autoencoder.requires_grad_(False)
+		pbar.update(1)
 
 		# condition encoders
 		self.audio_encoder 		= AudioEncoder(opt)
+		pbar.update(1)
 		self.emotion_encoder	= Audio2Emotion(opt)
+		pbar.update(1)
 
 		# FMT; Flow Matching Transformer
 		self.fmt = FlowMatchingTransformer(opt)
+		pbar.update(1)
 		
 		# ODE options
 		self.odeint_kwargs = {
@@ -47,7 +53,7 @@ class FLOAT(BaseModel):
 	######## Motion Encoder - Decoder ########
 	@torch.no_grad()
 	def encode_image_into_latent(self, x: torch.Tensor) -> list:
-		x_r, _, x_r_feats = self.motion_autoencoder.enc(x, input_target=None)
+		x_r, _, x_r_feats = self.motion_autoencoder.enc(x, input_target=None, pbar=self.pbar if self.first_run else None)
 		x_r_lambda = self.motion_autoencoder.enc.fc(x_r)
 		return x_r, x_r_lambda, x_r_feats
 
@@ -104,8 +110,6 @@ class FLOAT(BaseModel):
 		final_images_thwc_shape = (T, H, W, C)
 		processed_images_tensor_cpu = torch.empty(final_images_thwc_shape, dtype=torch.float32, device='cpu')
 
-		pbar = ProgressBar(T)
-
 		# Process first frame (t=0)
 		# img_0_gpu is (1, C, H, W)
 		img_0_squeezed_gpu = img_0_gpu.squeeze(0)             # (C, H, W)
@@ -113,7 +117,7 @@ class FLOAT(BaseModel):
 		img_0_processed = img_0_processed.detach().clamp(-1, 1)
 		img_0_processed = ((img_0_processed + 1) / 2)
 		processed_images_tensor_cpu[0] = img_0_processed.cpu() # Assign to the T dimension
-		pbar.update(1)
+		self.pbar.update(1)
 
 		# Loop through the rest of the frames (t=1 to T-1)
 		for t in tqdm(range(1, T), desc="Decoding Images"):
@@ -126,7 +130,7 @@ class FLOAT(BaseModel):
 			img_t_processed = img_t_processed.detach().clamp(-1, 1)
 			img_t_processed = ((img_t_processed + 1) / 2)
 			processed_images_tensor_cpu[t] = img_t_processed.cpu() # Assign to the T dimension
-			pbar.update(1)
+			self.pbar.update(1)
 
 		return processed_images_tensor_cpu # Shape (T, H, W, C)
 
@@ -162,8 +166,10 @@ class FLOAT(BaseModel):
 			we = F.one_hot(torch.tensor(emo_idx, device = a.device), num_classes = self.opt.dim_e).unsqueeze(0).unsqueeze(0)
 
 		sample = []
-		# sampleing chunk by chunk
-		for t in range(0, int(math.ceil(T / self.num_frames_for_clip))):
+		# sampling chunk by chunk
+		total_chunks = int(math.ceil(T / self.num_frames_for_clip))
+		iterable_chunks = tqdm(range(0, total_chunks), desc="Main inference (warm-up)", disable=not self.first_run)
+		for t in iterable_chunks:
 			if self.opt.fix_noise_seed:
 				seed = self.opt.seed if seed is None else seed	
 				g = torch.Generator(self.opt.rank)
@@ -205,6 +211,8 @@ class FLOAT(BaseModel):
 			trajectory_t = odeint(sample_chunk, x0, time, **self.odeint_kwargs)
 			sample_t = trajectory_t[-1]
 			sample.append(sample_t)
+			if self.first_run:
+				self.pbar.update(1)
 		sample = torch.cat(sample, dim=1)[:, :T]
 		return sample
 
@@ -222,12 +230,16 @@ class FLOAT(BaseModel):
 
 		s, a = data['s'], data['a']
 
+		# How many steps we will compute
+		T = math.ceil(a.shape[-1] * self.opt.fps / self.opt.sampling_rate)
+		steps = T  # decode steps
+		if self.first_run:
+			# The first run is a warm-up and is much slower
+			steps += len(self.motion_autoencoder.enc.net_app.convs)  # image encode steps
+			steps += int(math.ceil(T / self.num_frames_for_clip))  # sample steps
+		self.pbar = ProgressBar(steps)
 
-		# print("starting encoding")
-		# start = time.time()
 		s_r, r_s_lambda, s_r_feats = self.encode_image_into_latent(s.to(self.opt.rank))
-		# end = time.time()
-		# print(end-start, "encoding end")
 
 		if 's_r' in data:
 			r_s = self.encode_identity_into_motion(s_r)
@@ -240,11 +252,9 @@ class FLOAT(BaseModel):
 		if a_cfg_scale is None: a_cfg_scale = self.opt.a_cfg_scale
 		if r_cfg_scale is None: r_cfg_scale = self.opt.r_cfg_scale
 		if e_cfg_scale is None: e_cfg_scale = self.opt.e_cfg_scale
-		# print("starting actual inference")
-		# start = time.time()
 		sample = self.sample(data, a_cfg_scale = a_cfg_scale, r_cfg_scale = r_cfg_scale, e_cfg_scale = e_cfg_scale, emo = emo, nfe = nfe, seed = seed)
-		# end = time.time()
-		# print(end-start, "actual inference")
+
+		self.first_run = False
 
 		return self.decode_latent_into_processed_images(s_r = s_r, s_r_feats = s_r_feats, r_d = sample)
 
