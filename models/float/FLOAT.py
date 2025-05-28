@@ -1,9 +1,10 @@
-import torch, math
+from comfy.utils import ProgressBar
+import math
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchdiffeq import odeint
 from tqdm import tqdm
-from comfy.utils import ProgressBar
 
 from ...models.wav2vec2 import Wav2VecModel
 from ...models.wav2vec2_ser import Wav2Vec2ForSpeechClassification

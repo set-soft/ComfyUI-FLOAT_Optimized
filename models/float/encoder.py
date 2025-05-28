@@ -1,7 +1,8 @@
-import math, torch
-from tqdm.auto import tqdm
+import math
+import torch
 from torch import nn
 from torch.nn import functional as F
+from tqdm.auto import tqdm
 
 
 def fused_leaky_relu(input, bias, negative_slope=0.2, scale=2 ** 0.5):

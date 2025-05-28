@@ -2,13 +2,15 @@
     Inference Stage 2
 """
 
-import torch, cv2, librosa, face_alignment
-from typing import Union, Dict
-import numpy as np
-
-from tqdm import tqdm
+import cv2
 from comfy.utils import ProgressBar
+import face_alignment
+import librosa
+import numpy as np
+import torch
+from tqdm import tqdm
 from transformers import Wav2Vec2FeatureExtractor
+from typing import Union, Dict
 
 from .models.float.FLOAT import FLOAT
 from .resample import comfy_audio_to_librosa_mono

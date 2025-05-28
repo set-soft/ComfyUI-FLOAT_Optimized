@@ -1,10 +1,12 @@
-import math, torch
-import torch.nn as nn
-import torch.nn.functional as F
+import math
 from timm.layers import use_fused_attn
 from timm.models.vision_transformer import Mlp
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 from ..basemodel import BaseModel
+
 
 def enc_dec_mask(T, S, frame_width = 1, expansion = 2):
     mask = torch.ones(T, S)

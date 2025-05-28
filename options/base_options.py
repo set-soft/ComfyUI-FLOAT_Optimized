@@ -1,4 +1,4 @@
-import argparse, json
+import json
 from types import SimpleNamespace
 
 
