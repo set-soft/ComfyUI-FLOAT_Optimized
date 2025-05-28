@@ -91,11 +91,10 @@ class FloatProcess:
                 "ref_audio": ("AUDIO",),
                 "float_pipe": ("FLOAT_PIPE",),
                 "a_cfg_scale": ("FLOAT", {"default": 2.0,"min": 1.0, "step": 0.1}),
-                "r_cfg_scale": ("FLOAT", {"default": 1.0,"min": 1.0, "step": 0.1}),
                 "e_cfg_scale": ("FLOAT", {"default": 1.0,"min": 1.0, "step": 0.1}),
                 "fps": ("FLOAT", {"default": 25, "step": 1}),
                 "emotion": (['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise'], {"default": "none"}),
-                "crop": ("BOOLEAN",{"default":False},),
+                "face_align": ("BOOLEAN",{"default":False},),
                 "seed": ("INT", {"default": 62064758300528, "min": 0, "max": 0xffffffffffffffff}),
             },
         }
@@ -106,7 +105,7 @@ class FloatProcess:
     CATEGORY = "FLOAT"
     DESCRIPTION = "Float Processing"
 
-    def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, r_cfg_scale, e_cfg_scale, fps, emotion, crop, seed):
+    def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, e_cfg_scale, fps, emotion, face_align, seed):
         float_pipe.G.to(float_pipe.rank)
 
         float_pipe.opt.fps = fps
@@ -115,10 +114,10 @@ class FloatProcess:
             ref_image,
             ref_audio,
             a_cfg_scale = a_cfg_scale,
-            r_cfg_scale = r_cfg_scale,
+            r_cfg_scale = float_pipe.opt.r_cfg_scale,
             e_cfg_scale = e_cfg_scale,
             emo 		= None if emotion == "none" else emotion,
-            no_crop 	= not crop,
+            no_crop 	= not face_align,
             seed 		= seed
         )
 
@@ -132,6 +131,11 @@ class FloatAdvancedParameters:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "r_cfg_scale": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 1.0,
+                    "step": 0.1
+                }),
                 "attention_window": ("INT", {
                     "default": 2,
                     "min": 1,
@@ -195,10 +199,11 @@ class FloatAdvancedParameters:
     CATEGORY = "FLOAT"
     DESCRIPTION = "Float Advanced Options"
 
-    def get_options(self, attention_window, audio_dropout_prob, ref_dropout_prob, emotion_dropout_prob,
+    def get_options(self, r_cfg_scale, attention_window, audio_dropout_prob, ref_dropout_prob, emotion_dropout_prob,
                     ode_atol, ode_rtol, nfe, torchdiffeq_ode_method):
 
         options_dict = {
+            "r_cfg_scale": r_cfg_scale,
             "attention_window": attention_window,
             "audio_dropout_prob": audio_dropout_prob,
             "ref_dropout_prob": ref_dropout_prob,

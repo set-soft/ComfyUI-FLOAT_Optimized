@@ -1,14 +1,14 @@
 from .nodes import LoadFloatModels, FloatProcess, FloatAdvancedParameters
  
 NODE_CLASS_MAPPINGS = { 
-    "LoadFloatModels" : LoadFloatModels,
-    "FloatProcess" : FloatProcess,
+    "LoadFloatModelsOpt" : LoadFloatModels,
+    "FloatProcessOpt" : FloatProcess,
     "FloatAdvancedParameters": FloatAdvancedParameters,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-     "LoadFloatModels" : "Load Float Models",
-     "FloatProcess" : "Float Process",
+     "LoadFloatModelsOpt" : "Load Float Models (Opt)",
+     "FloatProcessOpt" : "Float Process (Opt)",
      "FloatAdvancedParameters": "Float Advanced Options",
 }
 
