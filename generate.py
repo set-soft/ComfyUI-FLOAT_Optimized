@@ -45,25 +45,28 @@ class DataProcessor:
         self.transform = CustomTransform(opt.input_size)
 
     @torch.no_grad()
-    def process_img(self, img:np.ndarray) -> np.ndarray:
+    def process_img(self, img: np.ndarray) -> np.ndarray:
         mult = 360. / img.shape[0]
 
-        resized_img = cv2.resize(img, dsize=(0, 0), fx = mult, fy = mult, interpolation=cv2.INTER_AREA if mult < 1. else cv2.INTER_CUBIC)
+        resized_img = cv2.resize(img, dsize=(0, 0), fx=mult, fy=mult, interpolation=cv2.INTER_AREA
+                                 if mult < 1. else cv2.INTER_CUBIC)
         bboxes = self.fa.face_detector.detect_from_image(resized_img)
-        bboxes = [(int(x1 / mult), int(y1 / mult), int(x2 / mult), int(y2 / mult), score) for (x1, y1, x2, y2, score) in bboxes if score > 0.95]
-        bboxes = bboxes[0] # Just use first bbox
+        bboxes = [(int(x1 / mult), int(y1 / mult), int(x2 / mult), int(y2 / mult), score)
+                  for (x1, y1, x2, y2, score) in bboxes if score > 0.95]
+        bboxes = bboxes[0]  # Just use first bbox
 
         bsy = int((bboxes[3] - bboxes[1]) / 2)
         bsx = int((bboxes[2] - bboxes[0]) / 2)
-        my  = int((bboxes[1] + bboxes[3]) / 2)
-        mx  = int((bboxes[0] + bboxes[2]) / 2)
+        my = int((bboxes[1] + bboxes[3]) / 2)
+        mx = int((bboxes[0] + bboxes[2]) / 2)
 
         bs = int(max(bsy, bsx) * 1.6)
         img = cv2.copyMakeBorder(img, bs, bs, bs, bs, cv2.BORDER_CONSTANT, value=0)
-        my, mx  = my + bs, mx + bs      # BBox center y, bbox center x
+        my, mx = my + bs, mx + bs      # BBox center y, bbox center x
 
-        crop_img = img[my - bs:my + bs,mx - bs:mx + bs]
-        crop_img = cv2.resize(crop_img, dsize = (self.input_size, self.input_size), interpolation = cv2.INTER_AREA if mult < 1. else cv2.INTER_CUBIC)
+        crop_img = img[my - bs:my + bs, mx - bs:mx + bs]
+        crop_img = cv2.resize(crop_img, dsize=(self.input_size, self.input_size), interpolation=cv2.INTER_AREA
+                              if mult < 1. else cv2.INTER_CUBIC)
         return crop_img
 
     def default_img_loader(self, path_or_tensor: Union[str, torch.Tensor]) -> np.ndarray:
@@ -109,7 +112,7 @@ class DataProcessor:
             img_tensor_hwc = comfy_image_tensor
         else:
             raise ValueError(f"Unsupported tensor ndim: {comfy_image_tensor.ndim}. "
-                                 "Expected 3 (H,W,C) or 4 (B,H,W,C).")
+                             "Expected 3 (H,W,C) or 4 (B,H,W,C).")
 
         # Convert to NumPy array
         # Tensor is assumed to be float32, range [0,1], and RGB channels
@@ -130,11 +133,10 @@ class DataProcessor:
             speech_array, sampling_rate = comfy_audio_to_librosa_mono(path['waveform'], path['sample_rate'],
                                                                       self.sampling_rate), self.sampling_rate
         else:
-            speech_array, sampling_rate = librosa.load(path, sr = self.sampling_rate)
-        return self.wav2vec_preprocessor(speech_array, sampling_rate = sampling_rate, return_tensors = 'pt').input_values[0]
+            speech_array, sampling_rate = librosa.load(path, sr=self.sampling_rate)
+        return self.wav2vec_preprocessor(speech_array, sampling_rate=sampling_rate, return_tensors='pt').input_values[0]
 
-
-    def preprocess(self, ref_path:Union[str, torch.Tensor], audio_path:Union[str, Dict], no_crop:bool) -> dict:
+    def preprocess(self, ref_path: Union[str, torch.Tensor], audio_path: Union[str, Dict], no_crop: bool) -> dict:
         s = self.default_img_loader(ref_path)
         if not no_crop:
             s = self.process_img(s)
@@ -182,25 +184,18 @@ class InferenceAgent:
         res_video_path: str,
         ref_path: Union[str, torch.Tensor],
         audio_path: Union[str, Dict],
-        a_cfg_scale: float  = 2.0,
-        r_cfg_scale: float  = 1.0,
-        e_cfg_scale: float  = 1.0,
-        emo: str            = 'S2E',
-        nfe: int            = 10,
-        no_crop: bool       = False,
-        seed: int           = 25,
-        verbose: bool       = False
+        a_cfg_scale: float = 2.0,
+        r_cfg_scale: float = 1.0,
+        e_cfg_scale: float = 1.0,
+        emo: str = 'S2E',
+        nfe: int = 10,
+        no_crop: bool = False,
+        seed: int = 25,
+        verbose: bool = False
     ) -> str:
-        data = self.data_processor.preprocess(ref_path, audio_path, no_crop = no_crop)
+        data = self.data_processor.preprocess(ref_path, audio_path, no_crop=no_crop)
 
         # inference
-        d_hat = self.G.inference(
-            data        = data,
-            a_cfg_scale = a_cfg_scale,
-            r_cfg_scale = r_cfg_scale,
-            e_cfg_scale = e_cfg_scale,
-            emo         = emo,
-            nfe         = nfe,
-            seed        = seed
-            )
+        d_hat = self.G.inference(data=data, a_cfg_scale=a_cfg_scale, r_cfg_scale=r_cfg_scale, e_cfg_scale=e_cfg_scale,
+                                 emo=emo, nfe=nfe, seed=seed)
         return d_hat
