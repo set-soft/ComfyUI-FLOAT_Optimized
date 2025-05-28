@@ -116,9 +116,9 @@ class FloatProcess:
             a_cfg_scale = a_cfg_scale,
             r_cfg_scale = float_pipe.opt.r_cfg_scale,
             e_cfg_scale = e_cfg_scale,
-            emo 		= None if emotion == "none" else emotion,
-            no_crop 	= not face_align,
-            seed 		= seed
+            emo         = None if emotion == "none" else emotion,
+            no_crop     = not face_align,
+            seed        = seed
         )
 
         float_pipe.G.to(mm.unet_offload_device())
