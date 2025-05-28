@@ -1,0 +1,1154 @@
+# float.pth
+
+## FLOAT
+
+- motion_autoencoder: 45.240 M
+  - enc: 22.726 M
+  - dec: 22.513 M
+
+- audio_encoder: 99.092 M
+  - wav2vec2: 94.372 M
+  - audio_projection: 4.720 M
+
+- emotion_encoder: 316.495 M
+  - wav2vec2_for_emotion: 316.495 M
+
+- fmt: 156.698 M
+  - x_embedder: 525.312 k
+  - t_embedder: 1.313 M
+  - c_embedder: 1.057 M
+  - blocks: 151.118 M
+  - decoder: 2.624 M
+
+Total number of parameters : 617.525 M
+
+# Individual nets
+
+## Generator (Motion autoencoder)
+
+- enc: 22.726 M
+  - net_app: 21.665 M
+  - fc: 1.061 M
+
+- dec: 22.513 M
+  - direction: 10.240 k
+  - input: 8.192 k
+  - conv1: 2.622 M
+  - to_rgb1: 1.542 k
+  - convs: 18.825 M
+  - upsamples: N/A
+  - to_rgbs: 6.090 k
+  - to_flows: 1.040 M
+
+Total number of parameters : 45.240 M
+
+
+## AudioEncoder
+
+- wav2vec2: 94.372 M
+  - feature_extractor: 4.200 M
+  - feature_projection: 395.008 k
+  - encoder: 89.775 M
+
+- audio_projection: 4.720 M
+  - 0: 4.719 M
+  - 1: 1.024 k
+  - 2: N/A
+
+Total number of parameters : 99.092 M
+
+
+## FlowMatchingTransformer
+
+- x_embedder: 525.312 k
+  - proj: 525.312 k
+  - norm: N/A
+
+- t_embedder: 1.313 M
+  - mlp: 1.313 M
+
+- c_embedder: 1.057 M
+
+- blocks: 151.118 M
+  - 0: 18.890 M
+  - 1: 18.890 M
+  - 2: 18.890 M
+  - 3: 18.890 M
+  - 4: 18.890 M
+  - 5: 18.890 M
+  - 6: 18.890 M
+  - 7: 18.890 M
+
+- decoder: 2.624 M
+  - norm_final: N/A
+  - adaLN_modulation: 2.099 M
+  - linear: 524.800 k
+
+Total number of parameters : 156.637 M
+
+# Full weights
+
+## FLOAT
+- motion_autoencoder: 45.24 M
+  - enc: 22.73 M
+    - net_app: 21.67 M
+      - convs: 21.67 M
+        - 0: 128
+          - 0: 96
+          - 1: 32
+        - 1: 29.79 K
+          - conv1: 9.25 K
+            - 0: 9.22 K
+            - 1: 32
+          - conv2: 18.50 K
+            - 0: N/A
+            - 1: 18.43 K
+            - 2: 64
+          - skip: 2.05 K
+            - 0: N/A
+            - 1: 2.05 K
+        - 2: 118.98 K
+          - conv1: 36.93 K
+            - 0: 36.86 K
+            - 1: 64
+          - conv2: 73.86 K
+            - 0: N/A
+            - 1: 73.73 K
+            - 2: 128
+          - skip: 8.19 K
+            - 0: N/A
+            - 1: 8.19 K
+        - 3: 475.52 K
+          - conv1: 147.58 K
+            - 0: 147.46 K
+            - 1: 128
+          - conv2: 295.17 K
+            - 0: N/A
+            - 1: 294.91 K
+            - 2: 256
+          - skip: 32.77 K
+            - 0: N/A
+            - 1: 32.77 K
+        - 4: 1.90 M
+          - conv1: 590.08 K
+            - 0: 589.82 K
+            - 1: 256
+          - conv2: 1.18 M
+            - 0: N/A
+            - 1: 1.18 M
+            - 2: 512
+          - skip: 131.07 K
+            - 0: N/A
+            - 1: 131.07 K
+        - 5: 4.98 M
+          - conv1: 2.36 M
+            - 0: 2.36 M
+            - 1: 512
+          - conv2: 2.36 M
+            - 0: N/A
+            - 1: 2.36 M
+            - 2: 512
+          - skip: 262.14 K
+            - 0: N/A
+            - 1: 262.14 K
+        - 6: 4.98 M
+          - conv1: 2.36 M
+            - 0: 2.36 M
+            - 1: 512
+          - conv2: 2.36 M
+            - 0: N/A
+            - 1: 2.36 M
+            - 2: 512
+          - skip: 262.14 K
+            - 0: N/A
+            - 1: 262.14 K
+        - 7: 4.98 M
+          - conv1: 2.36 M
+            - 0: 2.36 M
+            - 1: 512
+          - conv2: 2.36 M
+            - 0: N/A
+            - 1: 2.36 M
+            - 2: 512
+          - skip: 262.14 K
+            - 0: N/A
+            - 1: 262.14 K
+        - 8: 4.19 M
+    - fc: 1.06 M
+      - 0: 262.66 K
+      - 1: 262.66 K
+      - 2: 262.66 K
+      - 3: 262.66 K
+      - 4: 10.26 K
+  - dec: 22.51 M
+    - direction: 10.24 K
+    - input: 8.19 K
+    - conv1: 2.62 M
+      - conv: 2.62 M
+        - modulation: 262.66 K
+      - noise: 1
+      - activate: 512
+    - to_rgb1: 1.54 K
+      - conv: 1.54 K
+        - 0: 1.54 K
+        - 1: 3
+    - convs: 18.82 M
+      - 0: 2.62 M
+        - conv: 2.62 M
+          - blur: N/A
+          - modulation: 262.66 K
+        - noise: 1
+        - activate: 512
+      - 1: 2.62 M
+        - conv: 2.62 M
+          - modulation: 262.66 K
+        - noise: 1
+        - activate: 512
+      - 2: 2.62 M
+        - conv: 2.62 M
+          - blur: N/A
+          - modulation: 262.66 K
+        - noise: 1
+        - activate: 512
+      - 3: 2.62 M
+        - conv: 2.62 M
+          - modulation: 262.66 K
+        - noise: 1
+        - activate: 512
+      - 4: 2.62 M
+        - conv: 2.62 M
+          - blur: N/A
+          - modulation: 262.66 K
+        - noise: 1
+        - activate: 512
+      - 5: 2.62 M
+        - conv: 2.62 M
+          - modulation: 262.66 K
+        - noise: 1
+        - activate: 512
+      - 6: 1.44 M
+        - conv: 1.44 M
+          - blur: N/A
+          - modulation: 262.66 K
+        - noise: 1
+        - activate: 256
+      - 7: 721.41 K
+        - conv: 721.15 K
+          - modulation: 131.33 K
+        - noise: 1
+        - activate: 256
+      - 8: 426.37 K
+        - conv: 426.24 K
+          - blur: N/A
+          - modulation: 131.33 K
+        - noise: 1
+        - activate: 128
+      - 9: 213.25 K
+        - conv: 213.12 K
+          - modulation: 65.66 K
+        - noise: 1
+        - activate: 128
+      - 10: 139.46 K
+        - conv: 139.39 K
+          - blur: N/A
+          - modulation: 65.66 K
+        - noise: 1
+        - activate: 64
+      - 11: 69.76 K
+        - conv: 69.70 K
+          - modulation: 32.83 K
+        - noise: 1
+        - activate: 64
+      - 12: 51.30 K
+        - conv: 51.26 K
+          - blur: N/A
+          - modulation: 32.83 K
+        - noise: 1
+        - activate: 32
+      - 13: 25.66 K
+        - conv: 25.63 K
+          - modulation: 16.42 K
+        - noise: 1
+        - activate: 32
+    - upsamples: N/A
+    - to_rgbs: 6.09 K
+      - 0: 1.54 K
+        - upsample: N/A
+        - conv: 1.54 K
+          - 0: 1.54 K
+          - 1: 3
+      - 1: 1.54 K
+        - upsample: N/A
+        - conv: 1.54 K
+          - 0: 1.54 K
+          - 1: 3
+      - 2: 1.54 K
+        - upsample: N/A
+        - conv: 1.54 K
+          - 0: 1.54 K
+          - 1: 3
+      - 3: 774
+        - upsample: N/A
+        - conv: 771
+          - 0: 768
+          - 1: 3
+      - 4: 390
+        - upsample: N/A
+        - conv: 387
+          - 0: 384
+          - 1: 3
+      - 5: 198
+        - upsample: N/A
+        - conv: 195
+          - 0: 192
+          - 1: 3
+      - 6: 102
+        - upsample: N/A
+        - conv: 99
+          - 0: 96
+          - 1: 3
+    - to_flows: 1.04 M
+      - 0: 264.19 K
+        - upsample: N/A
+        - conv: 264.19 K
+          - modulation: 262.66 K
+      - 1: 264.19 K
+        - upsample: N/A
+        - conv: 264.19 K
+          - modulation: 262.66 K
+      - 2: 264.19 K
+        - upsample: N/A
+        - conv: 264.19 K
+          - modulation: 262.66 K
+      - 3: 132.10 K
+        - upsample: N/A
+        - conv: 132.10 K
+          - modulation: 131.33 K
+      - 4: 66.05 K
+        - upsample: N/A
+        - conv: 66.05 K
+          - modulation: 65.66 K
+      - 5: 33.03 K
+        - upsample: N/A
+        - conv: 33.02 K
+          - modulation: 32.83 K
+      - 6: 16.52 K
+        - upsample: N/A
+        - conv: 16.51 K
+          - modulation: 16.42 K
+- audio_encoder: 99.09 M
+  - wav2vec2: 94.37 M
+    - feature_extractor: 4.20 M
+      - conv_layers: 4.20 M
+        - 0: 6.14 K
+          - conv: 5.12 K
+          - activation: N/A
+          - layer_norm: 1.02 K
+        - 1: 786.43 K
+          - conv: 786.43 K
+          - activation: N/A
+        - 2: 786.43 K
+          - conv: 786.43 K
+          - activation: N/A
+        - 3: 786.43 K
+          - conv: 786.43 K
+          - activation: N/A
+        - 4: 786.43 K
+          - conv: 786.43 K
+          - activation: N/A
+        - 5: 524.29 K
+          - conv: 524.29 K
+          - activation: N/A
+        - 6: 524.29 K
+          - conv: 524.29 K
+          - activation: N/A
+    - feature_projection: 395.01 K
+      - layer_norm: 1.02 K
+      - projection: 393.98 K
+      - dropout: N/A
+    - encoder: 89.78 M
+      - pos_conv_embed: 4.72 M
+        - conv: 4.72 M
+          - parametrizations: 4.72 M
+            - weight: 4.72 M
+              - 0: N/A
+        - padding: N/A
+        - activation: N/A
+      - layer_norm: 1.54 K
+      - dropout: N/A
+      - layers: 85.05 M
+        - 0: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 1: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 2: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 3: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 4: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 5: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 6: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 7: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 8: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 9: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 10: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+        - 11: 7.09 M
+          - attention: 2.36 M
+            - k_proj: 590.59 K
+            - v_proj: 590.59 K
+            - q_proj: 590.59 K
+            - out_proj: 590.59 K
+          - dropout: N/A
+          - layer_norm: 1.54 K
+          - feed_forward: 4.72 M
+            - intermediate_dropout: N/A
+            - intermediate_dense: 2.36 M
+            - intermediate_act_fn: N/A
+            - output_dense: 2.36 M
+            - output_dropout: N/A
+          - final_layer_norm: 1.54 K
+  - audio_projection: 4.72 M
+    - 0: 4.72 M
+    - 1: 1.02 K
+    - 2: N/A
+- emotion_encoder: 316.50 M
+  - wav2vec2_for_emotion: 316.50 M
+    - wav2vec2: 315.44 M
+      - feature_extractor: 4.21 M
+        - conv_layers: 4.21 M
+          - 0: 6.66 K
+            - conv: 5.63 K
+            - layer_norm: 1.02 K
+            - activation: N/A
+          - 1: 787.97 K
+            - conv: 786.94 K
+            - layer_norm: 1.02 K
+            - activation: N/A
+          - 2: 787.97 K
+            - conv: 786.94 K
+            - layer_norm: 1.02 K
+            - activation: N/A
+          - 3: 787.97 K
+            - conv: 786.94 K
+            - layer_norm: 1.02 K
+            - activation: N/A
+          - 4: 787.97 K
+            - conv: 786.94 K
+            - layer_norm: 1.02 K
+            - activation: N/A
+          - 5: 525.82 K
+            - conv: 524.80 K
+            - layer_norm: 1.02 K
+            - activation: N/A
+          - 6: 525.82 K
+            - conv: 524.80 K
+            - layer_norm: 1.02 K
+            - activation: N/A
+      - feature_projection: 526.34 K
+        - layer_norm: 1.02 K
+        - projection: 525.31 K
+        - dropout: N/A
+      - encoder: 310.70 M
+        - pos_conv_embed: 8.39 M
+          - conv: 8.39 M
+            - parametrizations: 8.39 M
+              - weight: 8.39 M
+                - 0: N/A
+          - padding: N/A
+          - activation: N/A
+        - layer_norm: 2.05 K
+        - dropout: N/A
+        - layers: 302.31 M
+          - 0: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 1: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 2: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 3: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 4: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 5: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 6: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 7: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 8: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 9: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 10: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 11: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 12: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 13: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 14: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 15: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 16: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 17: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 18: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 19: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 20: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 21: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 22: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+          - 23: 12.60 M
+            - attention: 4.20 M
+              - k_proj: 1.05 M
+              - v_proj: 1.05 M
+              - q_proj: 1.05 M
+              - out_proj: 1.05 M
+            - dropout: N/A
+            - layer_norm: 2.05 K
+            - feed_forward: 8.39 M
+              - intermediate_dropout: N/A
+              - intermediate_dense: 4.20 M
+              - intermediate_act_fn: N/A
+              - output_dense: 4.20 M
+              - output_dropout: N/A
+            - final_layer_norm: 2.05 K
+    - classifier: 1.06 M
+      - dense: 1.05 M
+      - dropout: N/A
+      - out_proj: 7.17 K
+- fmt: 156.70 M
+  - x_embedder: 525.31 K
+    - proj: 525.31 K
+    - norm: N/A
+  - t_embedder: 1.31 M
+    - mlp: 1.31 M
+      - 0: 263.17 K
+      - 1: N/A
+      - 2: 1.05 M
+  - c_embedder: 1.06 M
+  - blocks: 151.12 M
+    - 0: 18.89 M
+      - norm1: N/A
+      - attn: 4.20 M
+        - qkv: 3.15 M
+        - q_norm: N/A
+        - k_norm: N/A
+        - attn_drop: N/A
+        - proj: 1.05 M
+        - proj_drop: N/A
+      - norm2: N/A
+      - mlp: 8.39 M
+        - fc1: 4.20 M
+        - act: N/A
+        - drop1: N/A
+        - norm: N/A
+        - fc2: 4.20 M
+        - drop2: N/A
+      - adaLN_modulation: 6.30 M
+        - 0: N/A
+        - 1: 6.30 M
+    - 1: 18.89 M
+      - norm1: N/A
+      - attn: 4.20 M
+        - qkv: 3.15 M
+        - q_norm: N/A
+        - k_norm: N/A
+        - attn_drop: N/A
+        - proj: 1.05 M
+        - proj_drop: N/A
+      - norm2: N/A
+      - mlp: 8.39 M
+        - fc1: 4.20 M
+        - act: N/A
+        - drop1: N/A
+        - norm: N/A
+        - fc2: 4.20 M
+        - drop2: N/A
+      - adaLN_modulation: 6.30 M
+        - 0: N/A
+        - 1: 6.30 M
+    - 2: 18.89 M
+      - norm1: N/A
+      - attn: 4.20 M
+        - qkv: 3.15 M
+        - q_norm: N/A
+        - k_norm: N/A
+        - attn_drop: N/A
+        - proj: 1.05 M
+        - proj_drop: N/A
+      - norm2: N/A
+      - mlp: 8.39 M
+        - fc1: 4.20 M
+        - act: N/A
+        - drop1: N/A
+        - norm: N/A
+        - fc2: 4.20 M
+        - drop2: N/A
+      - adaLN_modulation: 6.30 M
+        - 0: N/A
+        - 1: 6.30 M
+    - 3: 18.89 M
+      - norm1: N/A
+      - attn: 4.20 M
+        - qkv: 3.15 M
+        - q_norm: N/A
+        - k_norm: N/A
+        - attn_drop: N/A
+        - proj: 1.05 M
+        - proj_drop: N/A
+      - norm2: N/A
+      - mlp: 8.39 M
+        - fc1: 4.20 M
+        - act: N/A
+        - drop1: N/A
+        - norm: N/A
+        - fc2: 4.20 M
+        - drop2: N/A
+      - adaLN_modulation: 6.30 M
+        - 0: N/A
+        - 1: 6.30 M
+    - 4: 18.89 M
+      - norm1: N/A
+      - attn: 4.20 M
+        - qkv: 3.15 M
+        - q_norm: N/A
+        - k_norm: N/A
+        - attn_drop: N/A
+        - proj: 1.05 M
+        - proj_drop: N/A
+      - norm2: N/A
+      - mlp: 8.39 M
+        - fc1: 4.20 M
+        - act: N/A
+        - drop1: N/A
+        - norm: N/A
+        - fc2: 4.20 M
+        - drop2: N/A
+      - adaLN_modulation: 6.30 M
+        - 0: N/A
+        - 1: 6.30 M
+    - 5: 18.89 M
+      - norm1: N/A
+      - attn: 4.20 M
+        - qkv: 3.15 M
+        - q_norm: N/A
+        - k_norm: N/A
+        - attn_drop: N/A
+        - proj: 1.05 M
+        - proj_drop: N/A
+      - norm2: N/A
+      - mlp: 8.39 M
+        - fc1: 4.20 M
+        - act: N/A
+        - drop1: N/A
+        - norm: N/A
+        - fc2: 4.20 M
+        - drop2: N/A
+      - adaLN_modulation: 6.30 M
+        - 0: N/A
+        - 1: 6.30 M
+    - 6: 18.89 M
+      - norm1: N/A
+      - attn: 4.20 M
+        - qkv: 3.15 M
+        - q_norm: N/A
+        - k_norm: N/A
+        - attn_drop: N/A
+        - proj: 1.05 M
+        - proj_drop: N/A
+      - norm2: N/A
+      - mlp: 8.39 M
+        - fc1: 4.20 M
+        - act: N/A
+        - drop1: N/A
+        - norm: N/A
+        - fc2: 4.20 M
+        - drop2: N/A
+      - adaLN_modulation: 6.30 M
+        - 0: N/A
+        - 1: 6.30 M
+    - 7: 18.89 M
+      - norm1: N/A
+      - attn: 4.20 M
+        - qkv: 3.15 M
+        - q_norm: N/A
+        - k_norm: N/A
+        - attn_drop: N/A
+        - proj: 1.05 M
+        - proj_drop: N/A
+      - norm2: N/A
+      - mlp: 8.39 M
+        - fc1: 4.20 M
+        - act: N/A
+        - drop1: N/A
+        - norm: N/A
+        - fc2: 4.20 M
+        - drop2: N/A
+      - adaLN_modulation: 6.30 M
+        - 0: N/A
+        - 1: 6.30 M
+  - decoder: 2.62 M
+    - norm_final: N/A
+    - adaLN_modulation: 2.10 M
+      - 0: N/A
+      - 1: 2.10 M
+    - linear: 524.80 K
+
+Total number of parameters : 617.53 M

@@ -1,0 +1,1730 @@
+<h1 id="float.pth">float.pth</h1>
+<h2 id="float">FLOAT</h2>
+<ul class="incremental">
+<li>motion_autoencoder: 45.240 M
+<ul class="incremental">
+<li>enc: 22.726 M</li>
+<li>dec: 22.513 M</li>
+</ul></li>
+<li>audio_encoder: 99.092 M
+<ul class="incremental">
+<li>wav2vec2: 94.372 M</li>
+<li>audio_projection: 4.720 M</li>
+</ul></li>
+<li>emotion_encoder: 316.495 M
+<ul class="incremental">
+<li>wav2vec2_for_emotion: 316.495 M</li>
+</ul></li>
+<li>fmt: 156.698 M
+<ul class="incremental">
+<li>x_embedder: 525.312 k</li>
+<li>t_embedder: 1.313 M</li>
+<li>c_embedder: 1.057 M</li>
+<li>blocks: 151.118 M</li>
+<li>decoder: 2.624 M</li>
+</ul></li>
+</ul>
+<p>Total number of parameters : 617.525 M</p>
+<h1 id="individual-nets">Individual nets</h1>
+<h2 id="generator-motion-autoencoder">Generator (Motion
+autoencoder)</h2>
+<ul class="incremental">
+<li>enc: 22.726 M
+<ul class="incremental">
+<li>net_app: 21.665 M</li>
+<li>fc: 1.061 M</li>
+</ul></li>
+<li>dec: 22.513 M
+<ul class="incremental">
+<li>direction: 10.240 k</li>
+<li>input: 8.192 k</li>
+<li>conv1: 2.622 M</li>
+<li>to_rgb1: 1.542 k</li>
+<li>convs: 18.825 M</li>
+<li>upsamples: N/A</li>
+<li>to_rgbs: 6.090 k</li>
+<li>to_flows: 1.040 M</li>
+</ul></li>
+</ul>
+<p>Total number of parameters : 45.240 M</p>
+<h2 id="audioencoder">AudioEncoder</h2>
+<ul class="incremental">
+<li>wav2vec2: 94.372 M
+<ul class="incremental">
+<li>feature_extractor: 4.200 M</li>
+<li>feature_projection: 395.008 k</li>
+<li>encoder: 89.775 M</li>
+</ul></li>
+<li>audio_projection: 4.720 M
+<ul class="incremental">
+<li>0: 4.719 M</li>
+<li>1: 1.024 k</li>
+<li>2: N/A</li>
+</ul></li>
+</ul>
+<p>Total number of parameters : 99.092 M</p>
+<h2 id="flowmatchingtransformer">FlowMatchingTransformer</h2>
+<ul class="incremental">
+<li><p>x_embedder: 525.312 k</p>
+<ul class="incremental">
+<li>proj: 525.312 k</li>
+<li>norm: N/A</li>
+</ul></li>
+<li><p>t_embedder: 1.313 M</p>
+<ul class="incremental">
+<li>mlp: 1.313 M</li>
+</ul></li>
+<li><p>c_embedder: 1.057 M</p></li>
+<li><p>blocks: 151.118 M</p>
+<ul class="incremental">
+<li>0: 18.890 M</li>
+<li>1: 18.890 M</li>
+<li>2: 18.890 M</li>
+<li>3: 18.890 M</li>
+<li>4: 18.890 M</li>
+<li>5: 18.890 M</li>
+<li>6: 18.890 M</li>
+<li>7: 18.890 M</li>
+</ul></li>
+<li><p>decoder: 2.624 M</p>
+<ul class="incremental">
+<li>norm_final: N/A</li>
+<li>adaLN_modulation: 2.099 M</li>
+<li>linear: 524.800 k</li>
+</ul></li>
+</ul>
+<p>Total number of parameters : 156.637 M</p>
+<h1 id="full-weights">Full weights</h1>
+<h2 id="float-1">FLOAT</h2>
+<ul class="incremental">
+<li>motion_autoencoder: 45.24 M
+<ul class="incremental">
+<li>enc: 22.73 M
+<ul class="incremental">
+<li>net_app: 21.67 M
+<ul class="incremental">
+<li>convs: 21.67 M
+<ul class="incremental">
+<li>0: 128
+<ul class="incremental">
+<li>0: 96</li>
+<li>1: 32</li>
+</ul></li>
+<li>1: 29.79 K
+<ul class="incremental">
+<li>conv1: 9.25 K
+<ul class="incremental">
+<li>0: 9.22 K</li>
+<li>1: 32</li>
+</ul></li>
+<li>conv2: 18.50 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 18.43 K</li>
+<li>2: 64</li>
+</ul></li>
+<li>skip: 2.05 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 2.05 K</li>
+</ul></li>
+</ul></li>
+<li>2: 118.98 K
+<ul class="incremental">
+<li>conv1: 36.93 K
+<ul class="incremental">
+<li>0: 36.86 K</li>
+<li>1: 64</li>
+</ul></li>
+<li>conv2: 73.86 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 73.73 K</li>
+<li>2: 128</li>
+</ul></li>
+<li>skip: 8.19 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 8.19 K</li>
+</ul></li>
+</ul></li>
+<li>3: 475.52 K
+<ul class="incremental">
+<li>conv1: 147.58 K
+<ul class="incremental">
+<li>0: 147.46 K</li>
+<li>1: 128</li>
+</ul></li>
+<li>conv2: 295.17 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 294.91 K</li>
+<li>2: 256</li>
+</ul></li>
+<li>skip: 32.77 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 32.77 K</li>
+</ul></li>
+</ul></li>
+<li>4: 1.90 M
+<ul class="incremental">
+<li>conv1: 590.08 K
+<ul class="incremental">
+<li>0: 589.82 K</li>
+<li>1: 256</li>
+</ul></li>
+<li>conv2: 1.18 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 1.18 M</li>
+<li>2: 512</li>
+</ul></li>
+<li>skip: 131.07 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 131.07 K</li>
+</ul></li>
+</ul></li>
+<li>5: 4.98 M
+<ul class="incremental">
+<li>conv1: 2.36 M
+<ul class="incremental">
+<li>0: 2.36 M</li>
+<li>1: 512</li>
+</ul></li>
+<li>conv2: 2.36 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 2.36 M</li>
+<li>2: 512</li>
+</ul></li>
+<li>skip: 262.14 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 262.14 K</li>
+</ul></li>
+</ul></li>
+<li>6: 4.98 M
+<ul class="incremental">
+<li>conv1: 2.36 M
+<ul class="incremental">
+<li>0: 2.36 M</li>
+<li>1: 512</li>
+</ul></li>
+<li>conv2: 2.36 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 2.36 M</li>
+<li>2: 512</li>
+</ul></li>
+<li>skip: 262.14 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 262.14 K</li>
+</ul></li>
+</ul></li>
+<li>7: 4.98 M
+<ul class="incremental">
+<li>conv1: 2.36 M
+<ul class="incremental">
+<li>0: 2.36 M</li>
+<li>1: 512</li>
+</ul></li>
+<li>conv2: 2.36 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 2.36 M</li>
+<li>2: 512</li>
+</ul></li>
+<li>skip: 262.14 K
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 262.14 K</li>
+</ul></li>
+</ul></li>
+<li>8: 4.19 M</li>
+</ul></li>
+</ul></li>
+<li>fc: 1.06 M
+<ul class="incremental">
+<li>0: 262.66 K</li>
+<li>1: 262.66 K</li>
+<li>2: 262.66 K</li>
+<li>3: 262.66 K</li>
+<li>4: 10.26 K</li>
+</ul></li>
+</ul></li>
+<li>dec: 22.51 M
+<ul class="incremental">
+<li>direction: 10.24 K</li>
+<li>input: 8.19 K</li>
+<li>conv1: 2.62 M
+<ul class="incremental">
+<li>conv: 2.62 M
+<ul class="incremental">
+<li>modulation: 262.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 512</li>
+</ul></li>
+<li>to_rgb1: 1.54 K
+<ul class="incremental">
+<li>conv: 1.54 K
+<ul class="incremental">
+<li>0: 1.54 K</li>
+<li>1: 3</li>
+</ul></li>
+</ul></li>
+<li>convs: 18.82 M
+<ul class="incremental">
+<li>0: 2.62 M
+<ul class="incremental">
+<li>conv: 2.62 M
+<ul class="incremental">
+<li>blur: N/A</li>
+<li>modulation: 262.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 512</li>
+</ul></li>
+<li>1: 2.62 M
+<ul class="incremental">
+<li>conv: 2.62 M
+<ul class="incremental">
+<li>modulation: 262.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 512</li>
+</ul></li>
+<li>2: 2.62 M
+<ul class="incremental">
+<li>conv: 2.62 M
+<ul class="incremental">
+<li>blur: N/A</li>
+<li>modulation: 262.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 512</li>
+</ul></li>
+<li>3: 2.62 M
+<ul class="incremental">
+<li>conv: 2.62 M
+<ul class="incremental">
+<li>modulation: 262.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 512</li>
+</ul></li>
+<li>4: 2.62 M
+<ul class="incremental">
+<li>conv: 2.62 M
+<ul class="incremental">
+<li>blur: N/A</li>
+<li>modulation: 262.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 512</li>
+</ul></li>
+<li>5: 2.62 M
+<ul class="incremental">
+<li>conv: 2.62 M
+<ul class="incremental">
+<li>modulation: 262.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 512</li>
+</ul></li>
+<li>6: 1.44 M
+<ul class="incremental">
+<li>conv: 1.44 M
+<ul class="incremental">
+<li>blur: N/A</li>
+<li>modulation: 262.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 256</li>
+</ul></li>
+<li>7: 721.41 K
+<ul class="incremental">
+<li>conv: 721.15 K
+<ul class="incremental">
+<li>modulation: 131.33 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 256</li>
+</ul></li>
+<li>8: 426.37 K
+<ul class="incremental">
+<li>conv: 426.24 K
+<ul class="incremental">
+<li>blur: N/A</li>
+<li>modulation: 131.33 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 128</li>
+</ul></li>
+<li>9: 213.25 K
+<ul class="incremental">
+<li>conv: 213.12 K
+<ul class="incremental">
+<li>modulation: 65.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 128</li>
+</ul></li>
+<li>10: 139.46 K
+<ul class="incremental">
+<li>conv: 139.39 K
+<ul class="incremental">
+<li>blur: N/A</li>
+<li>modulation: 65.66 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 64</li>
+</ul></li>
+<li>11: 69.76 K
+<ul class="incremental">
+<li>conv: 69.70 K
+<ul class="incremental">
+<li>modulation: 32.83 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 64</li>
+</ul></li>
+<li>12: 51.30 K
+<ul class="incremental">
+<li>conv: 51.26 K
+<ul class="incremental">
+<li>blur: N/A</li>
+<li>modulation: 32.83 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 32</li>
+</ul></li>
+<li>13: 25.66 K
+<ul class="incremental">
+<li>conv: 25.63 K
+<ul class="incremental">
+<li>modulation: 16.42 K</li>
+</ul></li>
+<li>noise: 1</li>
+<li>activate: 32</li>
+</ul></li>
+</ul></li>
+<li>upsamples: N/A</li>
+<li>to_rgbs: 6.09 K
+<ul class="incremental">
+<li>0: 1.54 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 1.54 K
+<ul class="incremental">
+<li>0: 1.54 K</li>
+<li>1: 3</li>
+</ul></li>
+</ul></li>
+<li>1: 1.54 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 1.54 K
+<ul class="incremental">
+<li>0: 1.54 K</li>
+<li>1: 3</li>
+</ul></li>
+</ul></li>
+<li>2: 1.54 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 1.54 K
+<ul class="incremental">
+<li>0: 1.54 K</li>
+<li>1: 3</li>
+</ul></li>
+</ul></li>
+<li>3: 774
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 771
+<ul class="incremental">
+<li>0: 768</li>
+<li>1: 3</li>
+</ul></li>
+</ul></li>
+<li>4: 390
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 387
+<ul class="incremental">
+<li>0: 384</li>
+<li>1: 3</li>
+</ul></li>
+</ul></li>
+<li>5: 198
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 195
+<ul class="incremental">
+<li>0: 192</li>
+<li>1: 3</li>
+</ul></li>
+</ul></li>
+<li>6: 102
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 99
+<ul class="incremental">
+<li>0: 96</li>
+<li>1: 3</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>to_flows: 1.04 M
+<ul class="incremental">
+<li>0: 264.19 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 264.19 K
+<ul class="incremental">
+<li>modulation: 262.66 K</li>
+</ul></li>
+</ul></li>
+<li>1: 264.19 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 264.19 K
+<ul class="incremental">
+<li>modulation: 262.66 K</li>
+</ul></li>
+</ul></li>
+<li>2: 264.19 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 264.19 K
+<ul class="incremental">
+<li>modulation: 262.66 K</li>
+</ul></li>
+</ul></li>
+<li>3: 132.10 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 132.10 K
+<ul class="incremental">
+<li>modulation: 131.33 K</li>
+</ul></li>
+</ul></li>
+<li>4: 66.05 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 66.05 K
+<ul class="incremental">
+<li>modulation: 65.66 K</li>
+</ul></li>
+</ul></li>
+<li>5: 33.03 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 33.02 K
+<ul class="incremental">
+<li>modulation: 32.83 K</li>
+</ul></li>
+</ul></li>
+<li>6: 16.52 K
+<ul class="incremental">
+<li>upsample: N/A</li>
+<li>conv: 16.51 K
+<ul class="incremental">
+<li>modulation: 16.42 K</li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>audio_encoder: 99.09 M
+<ul class="incremental">
+<li>wav2vec2: 94.37 M
+<ul class="incremental">
+<li>feature_extractor: 4.20 M
+<ul class="incremental">
+<li>conv_layers: 4.20 M
+<ul class="incremental">
+<li>0: 6.14 K
+<ul class="incremental">
+<li>conv: 5.12 K</li>
+<li>activation: N/A</li>
+<li>layer_norm: 1.02 K</li>
+</ul></li>
+<li>1: 786.43 K
+<ul class="incremental">
+<li>conv: 786.43 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>2: 786.43 K
+<ul class="incremental">
+<li>conv: 786.43 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>3: 786.43 K
+<ul class="incremental">
+<li>conv: 786.43 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>4: 786.43 K
+<ul class="incremental">
+<li>conv: 786.43 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>5: 524.29 K
+<ul class="incremental">
+<li>conv: 524.29 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>6: 524.29 K
+<ul class="incremental">
+<li>conv: 524.29 K</li>
+<li>activation: N/A</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>feature_projection: 395.01 K
+<ul class="incremental">
+<li>layer_norm: 1.02 K</li>
+<li>projection: 393.98 K</li>
+<li>dropout: N/A</li>
+</ul></li>
+<li>encoder: 89.78 M
+<ul class="incremental">
+<li>pos_conv_embed: 4.72 M
+<ul class="incremental">
+<li>conv: 4.72 M
+<ul class="incremental">
+<li>parametrizations: 4.72 M
+<ul class="incremental">
+<li>weight: 4.72 M
+<ul class="incremental">
+<li>0: N/A</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>padding: N/A</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>layer_norm: 1.54 K</li>
+<li>dropout: N/A</li>
+<li>layers: 85.05 M
+<ul class="incremental">
+<li>0: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>1: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>2: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>3: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>4: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>5: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>6: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>7: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>8: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>9: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>10: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+<li>11: 7.09 M
+<ul class="incremental">
+<li>attention: 2.36 M
+<ul class="incremental">
+<li>k_proj: 590.59 K</li>
+<li>v_proj: 590.59 K</li>
+<li>q_proj: 590.59 K</li>
+<li>out_proj: 590.59 K</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 1.54 K</li>
+<li>feed_forward: 4.72 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 2.36 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 2.36 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 1.54 K</li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>audio_projection: 4.72 M
+<ul class="incremental">
+<li>0: 4.72 M</li>
+<li>1: 1.02 K</li>
+<li>2: N/A</li>
+</ul></li>
+</ul></li>
+<li>emotion_encoder: 316.50 M
+<ul class="incremental">
+<li>wav2vec2_for_emotion: 316.50 M
+<ul class="incremental">
+<li>wav2vec2: 315.44 M
+<ul class="incremental">
+<li>feature_extractor: 4.21 M
+<ul class="incremental">
+<li>conv_layers: 4.21 M
+<ul class="incremental">
+<li>0: 6.66 K
+<ul class="incremental">
+<li>conv: 5.63 K</li>
+<li>layer_norm: 1.02 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>1: 787.97 K
+<ul class="incremental">
+<li>conv: 786.94 K</li>
+<li>layer_norm: 1.02 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>2: 787.97 K
+<ul class="incremental">
+<li>conv: 786.94 K</li>
+<li>layer_norm: 1.02 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>3: 787.97 K
+<ul class="incremental">
+<li>conv: 786.94 K</li>
+<li>layer_norm: 1.02 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>4: 787.97 K
+<ul class="incremental">
+<li>conv: 786.94 K</li>
+<li>layer_norm: 1.02 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>5: 525.82 K
+<ul class="incremental">
+<li>conv: 524.80 K</li>
+<li>layer_norm: 1.02 K</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>6: 525.82 K
+<ul class="incremental">
+<li>conv: 524.80 K</li>
+<li>layer_norm: 1.02 K</li>
+<li>activation: N/A</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>feature_projection: 526.34 K
+<ul class="incremental">
+<li>layer_norm: 1.02 K</li>
+<li>projection: 525.31 K</li>
+<li>dropout: N/A</li>
+</ul></li>
+<li>encoder: 310.70 M
+<ul class="incremental">
+<li>pos_conv_embed: 8.39 M
+<ul class="incremental">
+<li>conv: 8.39 M
+<ul class="incremental">
+<li>parametrizations: 8.39 M
+<ul class="incremental">
+<li>weight: 8.39 M
+<ul class="incremental">
+<li>0: N/A</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>padding: N/A</li>
+<li>activation: N/A</li>
+</ul></li>
+<li>layer_norm: 2.05 K</li>
+<li>dropout: N/A</li>
+<li>layers: 302.31 M
+<ul class="incremental">
+<li>0: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>1: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>2: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>3: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>4: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>5: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>6: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>7: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>8: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>9: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>10: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>11: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>12: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>13: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>14: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>15: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>16: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>17: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>18: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>19: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>20: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>21: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>22: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+<li>23: 12.60 M
+<ul class="incremental">
+<li>attention: 4.20 M
+<ul class="incremental">
+<li>k_proj: 1.05 M</li>
+<li>v_proj: 1.05 M</li>
+<li>q_proj: 1.05 M</li>
+<li>out_proj: 1.05 M</li>
+</ul></li>
+<li>dropout: N/A</li>
+<li>layer_norm: 2.05 K</li>
+<li>feed_forward: 8.39 M
+<ul class="incremental">
+<li>intermediate_dropout: N/A</li>
+<li>intermediate_dense: 4.20 M</li>
+<li>intermediate_act_fn: N/A</li>
+<li>output_dense: 4.20 M</li>
+<li>output_dropout: N/A</li>
+</ul></li>
+<li>final_layer_norm: 2.05 K</li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>classifier: 1.06 M
+<ul class="incremental">
+<li>dense: 1.05 M</li>
+<li>dropout: N/A</li>
+<li>out_proj: 7.17 K</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>fmt: 156.70 M
+<ul class="incremental">
+<li>x_embedder: 525.31 K
+<ul class="incremental">
+<li>proj: 525.31 K</li>
+<li>norm: N/A</li>
+</ul></li>
+<li>t_embedder: 1.31 M
+<ul class="incremental">
+<li>mlp: 1.31 M
+<ul class="incremental">
+<li>0: 263.17 K</li>
+<li>1: N/A</li>
+<li>2: 1.05 M</li>
+</ul></li>
+</ul></li>
+<li>c_embedder: 1.06 M</li>
+<li>blocks: 151.12 M
+<ul class="incremental">
+<li>0: 18.89 M
+<ul class="incremental">
+<li>norm1: N/A</li>
+<li>attn: 4.20 M
+<ul class="incremental">
+<li>qkv: 3.15 M</li>
+<li>q_norm: N/A</li>
+<li>k_norm: N/A</li>
+<li>attn_drop: N/A</li>
+<li>proj: 1.05 M</li>
+<li>proj_drop: N/A</li>
+</ul></li>
+<li>norm2: N/A</li>
+<li>mlp: 8.39 M
+<ul class="incremental">
+<li>fc1: 4.20 M</li>
+<li>act: N/A</li>
+<li>drop1: N/A</li>
+<li>norm: N/A</li>
+<li>fc2: 4.20 M</li>
+<li>drop2: N/A</li>
+</ul></li>
+<li>adaLN_modulation: 6.30 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 6.30 M</li>
+</ul></li>
+</ul></li>
+<li>1: 18.89 M
+<ul class="incremental">
+<li>norm1: N/A</li>
+<li>attn: 4.20 M
+<ul class="incremental">
+<li>qkv: 3.15 M</li>
+<li>q_norm: N/A</li>
+<li>k_norm: N/A</li>
+<li>attn_drop: N/A</li>
+<li>proj: 1.05 M</li>
+<li>proj_drop: N/A</li>
+</ul></li>
+<li>norm2: N/A</li>
+<li>mlp: 8.39 M
+<ul class="incremental">
+<li>fc1: 4.20 M</li>
+<li>act: N/A</li>
+<li>drop1: N/A</li>
+<li>norm: N/A</li>
+<li>fc2: 4.20 M</li>
+<li>drop2: N/A</li>
+</ul></li>
+<li>adaLN_modulation: 6.30 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 6.30 M</li>
+</ul></li>
+</ul></li>
+<li>2: 18.89 M
+<ul class="incremental">
+<li>norm1: N/A</li>
+<li>attn: 4.20 M
+<ul class="incremental">
+<li>qkv: 3.15 M</li>
+<li>q_norm: N/A</li>
+<li>k_norm: N/A</li>
+<li>attn_drop: N/A</li>
+<li>proj: 1.05 M</li>
+<li>proj_drop: N/A</li>
+</ul></li>
+<li>norm2: N/A</li>
+<li>mlp: 8.39 M
+<ul class="incremental">
+<li>fc1: 4.20 M</li>
+<li>act: N/A</li>
+<li>drop1: N/A</li>
+<li>norm: N/A</li>
+<li>fc2: 4.20 M</li>
+<li>drop2: N/A</li>
+</ul></li>
+<li>adaLN_modulation: 6.30 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 6.30 M</li>
+</ul></li>
+</ul></li>
+<li>3: 18.89 M
+<ul class="incremental">
+<li>norm1: N/A</li>
+<li>attn: 4.20 M
+<ul class="incremental">
+<li>qkv: 3.15 M</li>
+<li>q_norm: N/A</li>
+<li>k_norm: N/A</li>
+<li>attn_drop: N/A</li>
+<li>proj: 1.05 M</li>
+<li>proj_drop: N/A</li>
+</ul></li>
+<li>norm2: N/A</li>
+<li>mlp: 8.39 M
+<ul class="incremental">
+<li>fc1: 4.20 M</li>
+<li>act: N/A</li>
+<li>drop1: N/A</li>
+<li>norm: N/A</li>
+<li>fc2: 4.20 M</li>
+<li>drop2: N/A</li>
+</ul></li>
+<li>adaLN_modulation: 6.30 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 6.30 M</li>
+</ul></li>
+</ul></li>
+<li>4: 18.89 M
+<ul class="incremental">
+<li>norm1: N/A</li>
+<li>attn: 4.20 M
+<ul class="incremental">
+<li>qkv: 3.15 M</li>
+<li>q_norm: N/A</li>
+<li>k_norm: N/A</li>
+<li>attn_drop: N/A</li>
+<li>proj: 1.05 M</li>
+<li>proj_drop: N/A</li>
+</ul></li>
+<li>norm2: N/A</li>
+<li>mlp: 8.39 M
+<ul class="incremental">
+<li>fc1: 4.20 M</li>
+<li>act: N/A</li>
+<li>drop1: N/A</li>
+<li>norm: N/A</li>
+<li>fc2: 4.20 M</li>
+<li>drop2: N/A</li>
+</ul></li>
+<li>adaLN_modulation: 6.30 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 6.30 M</li>
+</ul></li>
+</ul></li>
+<li>5: 18.89 M
+<ul class="incremental">
+<li>norm1: N/A</li>
+<li>attn: 4.20 M
+<ul class="incremental">
+<li>qkv: 3.15 M</li>
+<li>q_norm: N/A</li>
+<li>k_norm: N/A</li>
+<li>attn_drop: N/A</li>
+<li>proj: 1.05 M</li>
+<li>proj_drop: N/A</li>
+</ul></li>
+<li>norm2: N/A</li>
+<li>mlp: 8.39 M
+<ul class="incremental">
+<li>fc1: 4.20 M</li>
+<li>act: N/A</li>
+<li>drop1: N/A</li>
+<li>norm: N/A</li>
+<li>fc2: 4.20 M</li>
+<li>drop2: N/A</li>
+</ul></li>
+<li>adaLN_modulation: 6.30 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 6.30 M</li>
+</ul></li>
+</ul></li>
+<li>6: 18.89 M
+<ul class="incremental">
+<li>norm1: N/A</li>
+<li>attn: 4.20 M
+<ul class="incremental">
+<li>qkv: 3.15 M</li>
+<li>q_norm: N/A</li>
+<li>k_norm: N/A</li>
+<li>attn_drop: N/A</li>
+<li>proj: 1.05 M</li>
+<li>proj_drop: N/A</li>
+</ul></li>
+<li>norm2: N/A</li>
+<li>mlp: 8.39 M
+<ul class="incremental">
+<li>fc1: 4.20 M</li>
+<li>act: N/A</li>
+<li>drop1: N/A</li>
+<li>norm: N/A</li>
+<li>fc2: 4.20 M</li>
+<li>drop2: N/A</li>
+</ul></li>
+<li>adaLN_modulation: 6.30 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 6.30 M</li>
+</ul></li>
+</ul></li>
+<li>7: 18.89 M
+<ul class="incremental">
+<li>norm1: N/A</li>
+<li>attn: 4.20 M
+<ul class="incremental">
+<li>qkv: 3.15 M</li>
+<li>q_norm: N/A</li>
+<li>k_norm: N/A</li>
+<li>attn_drop: N/A</li>
+<li>proj: 1.05 M</li>
+<li>proj_drop: N/A</li>
+</ul></li>
+<li>norm2: N/A</li>
+<li>mlp: 8.39 M
+<ul class="incremental">
+<li>fc1: 4.20 M</li>
+<li>act: N/A</li>
+<li>drop1: N/A</li>
+<li>norm: N/A</li>
+<li>fc2: 4.20 M</li>
+<li>drop2: N/A</li>
+</ul></li>
+<li>adaLN_modulation: 6.30 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 6.30 M</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li>decoder: 2.62 M
+<ul class="incremental">
+<li>norm_final: N/A</li>
+<li>adaLN_modulation: 2.10 M
+<ul class="incremental">
+<li>0: N/A</li>
+<li>1: 2.10 M</li>
+</ul></li>
+<li>linear: 524.80 K</li>
+</ul></li>
+</ul></li>
+</ul>
+<p>Total number of parameters : 617.53 M</p>
