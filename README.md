@@ -90,7 +90,7 @@ You can download the file to a folder named `models/float` inside your ComfyUI i
 }
 ```
 
-## #&128101; Attributions
+## &#128101; Attributions
 
 - **FLOAT: Generative Motion Latent Flow Matching for Audio-driven Talking Portrait** by
   [Taekyung Ki](https://taekyungki.github.io), [Dongchan Min](https://kevinmin95.github.io), [Gyeongsu Chae](https://www.aistudios.com/ko)
