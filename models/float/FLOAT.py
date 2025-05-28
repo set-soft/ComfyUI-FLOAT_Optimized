@@ -51,6 +51,7 @@ class FLOAT(BaseModel):
             'rtol': self.opt.ode_rtol,
             'method': self.opt.torchdiffeq_ode_method
         }
+        self.print_architecture()
 
     # ######## Motion Encoder - Decoder ########
     @torch.no_grad()
@@ -291,6 +292,7 @@ class AudioEncoder(BaseModel):
             nn.LayerNorm(opt.dim_w),
             nn.SiLU()
             )
+        self.print_architecture()
 
     def get_wav2vec2_feature(self, a: torch.Tensor, seq_len: int) -> torch.Tensor:
         a = self.wav2vec2(a, seq_len=seq_len, output_hidden_states=not self.only_last_features)

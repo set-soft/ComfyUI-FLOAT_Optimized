@@ -234,6 +234,7 @@ class FlowMatchingTransformer(BaseModel):
         alignment_mask = enc_dec_mask(self.num_total_frames, self.num_total_frames, 1,
                                       expansion=opt.attention_window).to(opt.rank)
         self.register_buffer('alignment_mask', alignment_mask)
+        self.print_architecture()
 
     def initialize_weights(self) -> None:
         def _basic_init(module):

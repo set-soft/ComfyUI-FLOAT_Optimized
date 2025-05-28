@@ -14,6 +14,7 @@ class Generator(BaseModel):
 
         self.enc = Encoder(size, style_dim, motion_dim)
         self.dec = Synthesis(size, style_dim, motion_dim, blur_kernel, channel_multiplier)
+        self.print_architecture()
 
     def get_direction(self):
         return self.dec.direction(None)
