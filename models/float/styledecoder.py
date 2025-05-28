@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 DeepBrain AI Research
+# License: CC BY-NC-SA 4.0
+# Project: ComfyUI-Float_Optimized
 import math
 import numpy as np
 import torch

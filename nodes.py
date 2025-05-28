@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Yuvraj Seegolam
+# Copyright (c) 2025 Salvador E. Tropea
+# Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
+# License: CC BY-NC-SA 4.0
+# Project: ComfyUI-Float_Optimized
 import os
 import folder_paths
 import comfy.model_management as mm
