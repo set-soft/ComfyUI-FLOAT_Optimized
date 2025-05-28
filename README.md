@@ -1,6 +1,6 @@
 <div align="center">
 
-# ComfyUI FLOAT 
+# ComfyUI FLOAT Optimized
 
 [![python](https://img.shields.io/badge/python-3.10.12-green)](https://www.python.org/downloads/release/python-31012/)
 [![arXiv](https://img.shields.io/badge/arXiv%20paper-2412.09013-b31b1b.svg)](https://arxiv.org/abs/2412.01064) 
@@ -10,49 +10,77 @@
 
 This project provides a ComfyUI wrapper of [FLOAT](https://github.com/deepbrainai-research/float) for Generative Motion Latent Flow Matching for Audio-driven Talking Portrait
 
+The code was optimized to reduce VRAM usage and avoid temporal files.
+
+> [!WARNING]
+> **FLOAT is not for commercial use.**
+> Please refer to the licensing terms for more details.
+
+
 <div align="center">
   <video src="https://github.com/user-attachments/assets/36626b4a-d3e5-4db9-87a7-ca0e949daee0" />
 </div> 
 
 
-## ⭐ Support
-If you like my projects and wish to see updates and new features, please consider supporting me. It helps a lot! 
-
-[![ComfyUI-Depth-Anything-Tensorrt](https://img.shields.io/badge/ComfyUI--Depth--Anything--Tensorrt-blue?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-Depth-Anything-Tensorrt)
-[![ComfyUI-Upscaler-Tensorrt](https://img.shields.io/badge/ComfyUI--Upscaler--Tensorrt-blue?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-Upscaler-Tensorrt)
-[![ComfyUI-Dwpose-Tensorrt](https://img.shields.io/badge/ComfyUI--Dwpose--Tensorrt-blue?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-Dwpose-Tensorrt)
-[![ComfyUI-Rife-Tensorrt](https://img.shields.io/badge/ComfyUI--Rife--Tensorrt-blue?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-Rife-Tensorrt)
-
-[![ComfyUI-Whisper](https://img.shields.io/badge/ComfyUI--Whisper-gray?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-Whisper)
-[![ComfyUI_InvSR](https://img.shields.io/badge/ComfyUI__InvSR-gray?style=flat-square)](https://github.com/yuvraj108c/ComfyUI_InvSR)
-[![ComfyUI-FLOAT](https://img.shields.io/badge/ComfyUI--FLOAT-gray?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-FLOAT)
-[![ComfyUI-Thera](https://img.shields.io/badge/ComfyUI--Thera-gray?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-Thera)
-[![ComfyUI-Video-Depth-Anything](https://img.shields.io/badge/ComfyUI--Video--Depth--Anything-gray?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-Video-Depth-Anything)
-[![ComfyUI-PiperTTS](https://img.shields.io/badge/ComfyUI--PiperTTS-gray?style=flat-square)](https://github.com/yuvraj108c/ComfyUI-PiperTTS)
-
-[![buy-me-coffees](https://i.imgur.com/3MDbAtw.png)](https://www.buymeacoffee.com/yuvraj108cZ)
-[![paypal-donation](https://i.imgur.com/w5jjubk.png)](https://paypal.me/yuvraj108c)
----
-
 ## 🚀 Installation
 
 ```bash
-git clone https://github.com/yuvraj108c/ComfyUI-FLOAT.git
-cd ./ComfyUI-FLOAT
+git clone https://github.com/set-soft/ComfyUI-FLOAT_Optimized.git
+cd ./ComfyUI-FLOAT_Optimized
 pip install -r requirements.txt
 ```
 
 Note:
-- The code uses `torch` which installed for ComfyUI, part of its dependencies.
+- The code uses `torch` which is installed for ComfyUI, is part of its dependencies.
   This dependency isn't listed to avoid messing with it, which delicated.
 
 ## ☀️ Usage
 
 - Load [example workflow](float_workflow.json) 
-- Upload driving image and audio, click queue
-- Models autodownload to `/ComfyUI/models/float`
-  
-## Citation
+- Upload driving image and audio, click queue.
+  You can get the image originally used from [here](https://raw.githubusercontent.com/deepbrainai-research/float/refs/heads/main/assets/sam_altman_512x512.jpg),
+  and the audio from [here](https://github.com/deepbrainai-research/float/raw/refs/heads/main/assets/aud-sample-vs-1.wav)
+- Models autodownload to `/ComfyUI/models/float`.
+  But you can also download them manually.
+
+## &#128190; Manual models download
+
+Models are automatically downloaded, but you can also download them manually.
+This is for advanced use, not usually needed.
+Three *models* are needed.
+
+### Wav2Vec 2.0
+
+This is an audio encoder used as base for speech recognition. Was created by FaceBook AI.
+You can download the files to a folder named `models/audio/wav2vec2-base-960h` inside your ComfyUI installation.
+Note that you don't need to include *pytorch_model.bin* or *tf_model.h5*, you just need the JSON files and *model.safetensors*
+
+- Repo: [HuggingFace repo](https://huggingface.co/facebook/wav2vec2-base-960h).
+- License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
+- Paper: https://huggingface.co/papers/2006.11477
+
+### Speech Emotion Recognition
+
+This is what FLOAT uses to detect the emotion in the audio, uses Wav2Vec 2.0 as base.
+Well, in fact is based on another net that uses Wav2Vec ([Base](https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-english))
+You can download the files to a folder named `models/audio/wav2vec-english-speech-emotion-recognition` inside your ComfyUI installation.
+
+- Repo: [HuggingFace repo](https://huggingface.co/r-f/wav2vec-english-speech-emotion-recognition).
+- License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
+- Paper: doi 10.57967/hf/3569 (for the base speech recognition model)
+
+### FLOAT
+
+This is the main model.
+You can download the file to a folder named `models/float` inside your ComfyUI installation.
+
+- Repo: [GitHub page](https://github.com/deepbrainai-research/float)
+        [download 1](https://drive.google.com/file/d/1rvWuM12cyvNvBQNCLmG4Fr2L1rpjQBF0/view?pli=1)
+        [download 2](https://huggingface.co/yuvraj108c/float/resolve/main/float.pth?download=true)
+- License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
+## Citation of the paper
+
 ```bibtex
 @article{ki2024float,
   title={FLOAT: Generative Motion Latent Flow Matching for Audio-driven Talking Portrait},
@@ -62,8 +90,19 @@ Note:
 }
 ```
 
-## Acknowledgments
-Thanks to [simplepod.ai](https://simplepod.ai/) for providing GPU servers
+## #&128101; Attributions
+
+- **FLOAT: Generative Motion Latent Flow Matching for Audio-driven Talking Portrait** by
+  [Taekyung Ki](https://taekyungki.github.io), [Dongchan Min](https://kevinmin95.github.io), [Gyeongsu Chae](https://www.aistudios.com/ko)
+  [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+- **Wav2Vec 2.0**  by
+  Alexei Baevski, Henry Zhou, Abdelrahman Mohamed, Michael Auli from [FaceBook AI](https://ai.meta.com/)
+  [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
+- **Speech Emotion Recognition By Fine-Tuning Wav2Vec 2.0** by
+  [Rob Field](https://huggingface.co/r-f) et al.
+  [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
+- **Base FLOAT nodes for ComfyUI** by Yuvraj Seegolam [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+- **Optimizations** by Salvador E. Tropea [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
 ## License
 
