@@ -1,21 +1,16 @@
 import torch, math
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torchdiffeq import odeint
-from transformers import Wav2Vec2Config
-from transformers.modeling_outputs import BaseModelOutput
+from tqdm import tqdm
+from comfy.utils import ProgressBar
 
 from ...models.wav2vec2 import Wav2VecModel
 from ...models.wav2vec2_ser import Wav2Vec2ForSpeechClassification
-
 from ...models.basemodel import BaseModel
 from .generator import Generator
 from .FMT import FlowMatchingTransformer
-import time
 
-from tqdm import tqdm
-from comfy.utils import ProgressBar
 
 ######## Main Phase 2 model ########
 class FLOAT(BaseModel):
@@ -322,7 +317,7 @@ class Audio2Emotion(nn.Module):
         super().__init__()
         self.wav2vec2_for_emotion = Wav2Vec2ForSpeechClassification.from_pretrained(opt.audio2emotion_path, local_files_only=True)
         self.wav2vec2_for_emotion.eval()
-        
+
         # seven labels
         self.id2label = {0: "angry", 1: "disgust", 2: "fear", 3: "happy",
                         4: "neutral", 5: "sad", 6: "surprise"}

@@ -2,13 +2,12 @@
     Inference Stage 2
 """
 
-import os, torch, cv2, torchvision, librosa, face_alignment
+import torch, cv2, librosa, face_alignment
 from typing import Union, Dict
 import numpy as np
 
 from tqdm import tqdm
 from comfy.utils import ProgressBar
-from pathlib import Path
 from transformers import Wav2Vec2FeatureExtractor
 
 from .models.float.FLOAT import FLOAT

@@ -1,12 +1,10 @@
-import os, torch
+import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from transformers.file_utils import ModelOutput
-from transformers import Wav2Vec2FeatureExtractor
 from transformers.models.wav2vec2.modeling_wav2vec2 import Wav2Vec2PreTrainedModel, Wav2Vec2Model
 
 
@@ -120,5 +118,3 @@ class Wav2Vec2ForSpeechClassification(Wav2Vec2PreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-

@@ -1,4 +1,4 @@
-import os, argparse, json
+import argparse, json
 
 
 from types import SimpleNamespace
@@ -20,12 +20,12 @@ class BaseOptions():
 
 		# video
 		parser.add_argument('--input_size', type=int, default=512, help='input image size')
-		parser.add_argument('--input_nc', type=int, default=3, help='input image channel')        
+		parser.add_argument('--input_nc', type=int, default=3, help='input image channel')
 		parser.add_argument('--fps', type=float, default=25.)
 
 		# audio
 		parser.add_argument('--sampling_rate', type=int, default=16000)
-		parser.add_argument('--audio_marcing', type=int, default=2, help='number of adjacent frames. For value v, t -> [t-v, ..., t, ..., t+v]')        
+		parser.add_argument('--audio_marcing', type=int, default=2, help='number of adjacent frames. For value v, t -> [t-v, ..., t, ..., t+v]')
 		parser.add_argument('--wav2vec_sec', default=2, type=float, help='window length L (seconds), 50 frames')
 		parser.add_argument('--wav2vec_model_path', default='./checkpoints/wav2vec2-base-960h')
 		parser.add_argument('--audio2emotion_path', default='./checkpoints/wav2vec-english-speech-emotion-recognition')
@@ -64,9 +64,9 @@ class BaseOptions():
 		parser.add_argument('--a_cfg_scale', default=2.0, type=float,
 							help='audio classifier-free guidance (vector field) scale')
 		parser.add_argument('--e_cfg_scale', default=1.0, type=float,
-							help='emotion classifier-free guidance (vector field) scale')        
+							help='emotion classifier-free guidance (vector field) scale')
 		parser.add_argument('--r_cfg_scale', default=1.0, type=float,
-							help='reference classifier-free guidance (vector field) scale')        
+							help='reference classifier-free guidance (vector field) scale')
 
 		# option for Diffusion (ablation)
 		parser.add_argument('--n_diff_steps', type=int, default=500, help='number of diffusion steps')

@@ -1,13 +1,10 @@
-import os, math, torch
+import math, torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torchdiffeq import odeint
-from ..basemodel import BaseModel
-
 from timm.layers import use_fused_attn
 from timm.models.vision_transformer import Mlp
 
+from ..basemodel import BaseModel
 
 def enc_dec_mask(T, S, frame_width = 1, expansion = 2):
     mask = torch.ones(T, S)
@@ -164,7 +161,7 @@ class FMTBlock(nn.Module):
 
     def forward(self, x, c, mask=None) -> torch.Tensor:
         assert mask is not None
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=-1)        
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=-1)
         x = x + gate_msa * self.attn(self.framewise_modulate(self.norm1(x), shift_msa, scale_msa), mask = mask)
         x = x + gate_mlp * self.mlp(self.framewise_modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
@@ -271,7 +268,7 @@ class FlowMatchingTransformer(BaseModel):
         t: (B,) tensor of diffusion timesteps [0, 1]
         x: (B, L, 512) : tensor of sequence of motion latent
 
-        wa:  (B, L, 512)  / tensor sequence of wa latent 
+        wa:  (B, L, 512)  / tensor sequence of wa latent
         wp:  (B, L, 6)    / tensor sequence of wp latent
         wr:  (B, 512)     / tensor of reference motion latent (i.e., r -> s)
         we:  (B, 1, 7)    / tensor of emotion latent
@@ -293,7 +290,7 @@ class FlowMatchingTransformer(BaseModel):
             prev_x  = self.sequence_embedder(prev_x,  dropout_prob=0.5, train=train)
             prev_wa = self.sequence_embedder(prev_wa, dropout_prob=0.5, train=train)
 
-            x = torch.cat([prev_x, x], dim=1)   
+            x = torch.cat([prev_x, x], dim=1)
             wa = torch.cat([prev_wa, wa], dim=1)
 
         x = self.x_embedder(x)
@@ -333,4 +330,3 @@ class FlowMatchingTransformer(BaseModel):
             return uncond + a_cfg_scale * (audio_uncond_emotion - uncond) + e_cfg_scale * (all_cond - audio_uncond_emotion)
         else:
             return self.forward(t, x, wa, wr, we, prev_x, prev_wa, train = False)
-

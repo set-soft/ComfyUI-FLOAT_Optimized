@@ -1,4 +1,3 @@
-from torch import nn
 from .encoder import Encoder
 from .styledecoder import Synthesis
 
@@ -22,4 +21,4 @@ class Generator(BaseModel):
         wa, alpha, feats = self.enc(img_source, img_drive, h_start)
         img_recon, flow = self.dec(wa, alpha, feats)
         return {'d_hat': img_recon, 'flow': flow}
-    
+

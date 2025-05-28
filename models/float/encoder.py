@@ -1,8 +1,5 @@
 import math, torch
-import numpy as np
 from tqdm.auto import tqdm
-from comfy.utils import ProgressBar
-
 from torch import nn
 from torch.nn import functional as F
 

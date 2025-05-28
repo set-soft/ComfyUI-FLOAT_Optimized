@@ -1,12 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-# from transformers import Wav2Vec2Config, Wav2Vec2Model
-# from transformers.modeling_outputs import BaseModelOutput
-
 
 from torch import Tensor
-from typing import Type, Any, Callable, Union, List, Optional
+from typing import Type, Callable, Union, List, Optional
 
 
 class BaseModel(torch.nn.Module):
@@ -140,7 +136,7 @@ class BaseModel(torch.nn.Module):
 #             attention_mask = self._get_feature_vector_attention_mask(
 #                 extract_features.shape[1], attention_mask, add_adapter=False
 #             )
-            
+
 
 #         hidden_states, extract_features = self.feature_projection(extract_features)
 #         hidden_states = self._mask_hidden_states(
@@ -315,18 +311,18 @@ class ResNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         )
-        
+
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
-        
+
         self.fc = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
             nn.Linear(512 * block.expansion, num_classes)
         )
-        
+
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
