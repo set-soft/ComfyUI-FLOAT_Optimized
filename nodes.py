@@ -9,7 +9,7 @@ import folder_paths
 import comfy.model_management as mm
 
 from .generate import InferenceAgent
-from .options.base_options import BaseOptionsJson
+from .options.base_options import BaseOptions
 
 # List of fixed-step solvers you from torchdiffeq
 TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
@@ -73,7 +73,7 @@ class LoadFloatModels:
             snapshot_download(repo_id="yuvraj108c/float", local_dir=float_models_dir, local_dir_use_symlinks=False)
 
         # use custom dictionary instead of original parser for arguments
-        opt = BaseOptionsJson
+        opt = BaseOptions
 
         if advanced_float_options is not None and isinstance(advanced_float_options, dict):
             for key, value in advanced_float_options.items():
