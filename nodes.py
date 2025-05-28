@@ -5,6 +5,7 @@
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
 import os
+import torch
 import folder_paths
 import comfy.model_management as mm
 
@@ -23,12 +24,27 @@ TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
 ]
 
 
+def get_torch_device_options():
+    options = ["cpu"]
+    if torch.cuda.is_available():
+        options.append("cuda")  # Default CUDA device
+        for i in range(torch.cuda.device_count()):
+            options.append(f"cuda:{i}")  # Specific CUDA devices
+    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        options.append("mps")
+    return options
+
+
 class LoadFloatModels:
     @classmethod
     def INPUT_TYPES(s):
+        device_options = get_torch_device_options()
+        default_device = "cuda" if "cuda" in device_options else "cpu"
+
         return {
             "required": {
-                "model": (['float.pth'],)
+                "model": (['float.pth'],),
+                "target_device": (device_options, {"default": default_device}),
             },
             "optional": {
                 "advanced_float_options": ("ADV_FLOAT_DICT",)
@@ -41,7 +57,7 @@ class LoadFloatModels:
     CATEGORY = "FLOAT"
     DESCRIPTION = "Models are auto-downloaded to /ComfyUI/models/float"
 
-    def loadmodel(self, model, advanced_float_options=None):
+    def loadmodel(self, model, target_device, advanced_float_options=None):
         # download models if not exist
         float_models_dir = os.path.join(folder_paths.models_dir, "float")
         os.makedirs(float_models_dir, exist_ok=True)
@@ -80,7 +96,7 @@ class LoadFloatModels:
                 if hasattr(opt, key):
                     setattr(opt, key, value)
 
-        opt.rank, opt.ngpus = 0, 1
+        opt.rank = torch.device(target_device)
         opt.ckpt_path = float_model_path
         opt.pretrained_dir = float_models_dir
         opt.wav2vec_model_path = wav2vec2_base_960h_models_dir
