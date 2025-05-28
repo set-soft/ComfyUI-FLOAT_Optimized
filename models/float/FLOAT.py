@@ -13,7 +13,7 @@ from .generator import Generator
 from .FMT import FlowMatchingTransformer
 
 
-######## Main Phase 2 model ########
+# ######## Main Phase 2 model ########
 class FLOAT(BaseModel):
     def __init__(self, opt):
         super().__init__()
@@ -25,14 +25,14 @@ class FLOAT(BaseModel):
         self.num_prev_frames = int(self.opt.num_prev_frames)
 
         # motion latent auto-encoder
-        self.motion_autoencoder = Generator(size = opt.input_size, style_dim = opt.dim_w, motion_dim = opt.dim_m)
+        self.motion_autoencoder = Generator(size=opt.input_size, style_dim=opt.dim_w, motion_dim=opt.dim_m)
         self.motion_autoencoder.requires_grad_(False)
         pbar.update(1)
 
         # condition encoders
-        self.audio_encoder      = AudioEncoder(opt)
+        self.audio_encoder = AudioEncoder(opt)
         pbar.update(1)
-        self.emotion_encoder    = Audio2Emotion(opt)
+        self.emotion_encoder = Audio2Emotion(opt)
         pbar.update(1)
 
         # FMT; Flow Matching Transformer
@@ -46,7 +46,7 @@ class FLOAT(BaseModel):
             'method': self.opt.torchdiffeq_ode_method
         }
 
-    ######## Motion Encoder - Decoder ########
+    # ######## Motion Encoder - Decoder ########
     @torch.no_grad()
     def encode_image_into_latent(self, x: torch.Tensor) -> list:
         x_r, _, x_r_feats = self.motion_autoencoder.enc(x, input_target=None, pbar=self.pbar if self.first_run else None)
@@ -60,13 +60,13 @@ class FLOAT(BaseModel):
         return r_x
 
     @torch.no_grad()
-    def decode_latent_into_image(self, s_r: torch.Tensor , s_r_feats: list, r_d: torch.Tensor) -> dict:
+    def decode_latent_into_image(self, s_r: torch.Tensor, s_r_feats: list, r_d: torch.Tensor) -> dict:
         # This is the original code as reference
         T = r_d.shape[1]
         d_hat = []
         for t in range(T):
             s_r_d_t = s_r + r_d[:, t]
-            img_t, _ = self.motion_autoencoder.dec(s_r_d_t, alpha = None, feats = s_r_feats)
+            img_t, _ = self.motion_autoencoder.dec(s_r_d_t, alpha=None, feats=s_r_feats)
             d_hat.append(img_t)
         d_hat = torch.stack(d_hat, dim=1).squeeze()
 
@@ -93,7 +93,7 @@ class FLOAT(BaseModel):
         # s_r and r_d[:,0] combine to form input for one "item" if s_r is (Z) or (1,Z)
         # and r_d is (T,Z) or (1,T,Z)
         s_r_d_0 = s_r + r_d[:, 0]  # Assuming this results in an effective (1, Z_dim) input to dec
-                                   # or that s_r and r_d are already shaped for B=1 processing.
+        #                            or that s_r and r_d are already shaped for B=1 processing.
 
         # img_0_gpu will be (1, C, H, W) based on our B=1 assumption for the output of dec
         img_0_gpu, _ = self.motion_autoencoder.dec(s_r_d_0, alpha=None, feats=s_r_feats)
@@ -108,11 +108,11 @@ class FLOAT(BaseModel):
 
         # Process first frame (t=0)
         # img_0_gpu is (1, C, H, W)
-        img_0_squeezed_gpu = img_0_gpu.squeeze(0)             # (C, H, W)
-        img_0_processed = img_0_squeezed_gpu.permute(1, 2, 0) # (H, W, C)
+        img_0_squeezed_gpu = img_0_gpu.squeeze(0)              # (C, H, W)
+        img_0_processed = img_0_squeezed_gpu.permute(1, 2, 0)  # (H, W, C)
         img_0_processed = img_0_processed.detach().clamp(-1, 1)
         img_0_processed = ((img_0_processed + 1) / 2)
-        processed_images_tensor_cpu[0] = img_0_processed.cpu() # Assign to the T dimension
+        processed_images_tensor_cpu[0] = img_0_processed.cpu()  # Assign to the T dimension
         self.pbar.update(1)
 
         # Loop through the rest of the frames (t=1 to T-1)
@@ -121,16 +121,16 @@ class FLOAT(BaseModel):
             # img_t_gpu will be (1, C, H, W)
             img_t_gpu, _ = self.motion_autoencoder.dec(s_r_d_t, alpha=None, feats=s_r_feats)
             # Process current frame
-            img_t_squeezed_gpu = img_t_gpu.squeeze(0)             # (C, H, W)
-            img_t_processed = img_t_squeezed_gpu.permute(1, 2, 0) # (H, W, C)
+            img_t_squeezed_gpu = img_t_gpu.squeeze(0)              # (C, H, W)
+            img_t_processed = img_t_squeezed_gpu.permute(1, 2, 0)  # (H, W, C)
             img_t_processed = img_t_processed.detach().clamp(-1, 1)
             img_t_processed = ((img_t_processed + 1) / 2)
-            processed_images_tensor_cpu[t] = img_t_processed.cpu() # Assign to the T dimension
+            processed_images_tensor_cpu[t] = img_t_processed.cpu()  # Assign to the T dimension
             self.pbar.update(1)
 
-        return processed_images_tensor_cpu # Shape (T, H, W, C)
+        return processed_images_tensor_cpu  # Shape (T, H, W, C)
 
-    ######## Motion Sampling and Inference ########
+    # ######## Motion Sampling and Inference ########
     @torch.no_grad()
     def sample(
         self,
@@ -159,7 +159,7 @@ class FLOAT(BaseModel):
         if emo_idx is None:
             we = self.emotion_encoder.predict_emotion(a).unsqueeze(1)
         else:
-            we = F.one_hot(torch.tensor(emo_idx, device = a.device), num_classes = self.opt.dim_e).unsqueeze(0).unsqueeze(0)
+            we = F.one_hot(torch.tensor(emo_idx, device=a.device), num_classes=self.opt.dim_e).unsqueeze(0).unsqueeze(0)
 
         # If we want reproducible results create generator
         if self.opt.fix_noise_seed:
@@ -172,10 +172,11 @@ class FLOAT(BaseModel):
         # sampling chunk by chunk
         total_chunks = int(math.ceil(T / self.num_frames_for_clip))
         iterable_chunks = tqdm(range(0, total_chunks), desc="Main inference (warm-up)", disable=not self.first_run)
+        sample_t = wa_t = None
         for t in iterable_chunks:
             x0 = torch.randn(B, self.num_frames_for_clip, self.opt.dim_w, device=self.opt.rank, generator=g)
 
-            if t == 0: # should define the previous
+            if t == 0:  # should define the previous
                 prev_x_t = torch.zeros(B, self.num_prev_frames, self.opt.dim_w).to(self.opt.rank)
                 prev_wa_t = torch.zeros(B, self.num_prev_frames, self.opt.dim_w).to(self.opt.rank)
             else:
@@ -184,21 +185,21 @@ class FLOAT(BaseModel):
 
             wa_t = wa[:, t * self.num_frames_for_clip: (t+1)*self.num_frames_for_clip]
 
-            if wa_t.shape[1] < self.num_frames_for_clip: # padding by replicate
+            if wa_t.shape[1] < self.num_frames_for_clip:  # padding by replicate
                 wa_t = F.pad(wa_t, (0, 0, 0, self.num_frames_for_clip - wa_t.shape[1]), mode='replicate')
 
             def sample_chunk(tt, zt):
                 out = self.fmt.forward_with_cfv(
-                        t           = tt.unsqueeze(0),
-                        x           = zt,
-                        wa          = wa_t,
-                        wr          = r_s,
-                        we          = we,
-                        prev_x      = prev_x_t,
-                        prev_wa     = prev_wa_t,
-                        a_cfg_scale = a_cfg_scale,
-                        r_cfg_scale = r_cfg_scale,
-                        e_cfg_scale = e_cfg_scale
+                        t=tt.unsqueeze(0),
+                        x=zt,
+                        wa=wa_t,
+                        wr=r_s,
+                        we=we,
+                        prev_x=prev_x_t,
+                        prev_wa=prev_wa_t,
+                        a_cfg_scale=a_cfg_scale,
+                        r_cfg_scale=r_cfg_scale,
+                        e_cfg_scale=e_cfg_scale
                         )
 
                 out_current = out[:, self.num_prev_frames:]
@@ -217,12 +218,12 @@ class FLOAT(BaseModel):
     def inference(
         self,
         data: dict,
-        a_cfg_scale = None,
-        r_cfg_scale = None,
-        e_cfg_scale = None,
-        emo         = None,
-        nfe         = 10,
-        seed        = None,
+        a_cfg_scale=None,
+        r_cfg_scale=None,
+        e_cfg_scale=None,
+        emo=None,
+        nfe=10,
+        seed=None,
     ) -> dict:
 
         s, a = data['s'], data['a']
@@ -244,21 +245,24 @@ class FLOAT(BaseModel):
             r_s = self.motion_autoencoder.dec.direction(r_s_lambda)
         data['r_s'] = r_s
 
-
         # set conditions
-        if a_cfg_scale is None: a_cfg_scale = self.opt.a_cfg_scale
-        if r_cfg_scale is None: r_cfg_scale = self.opt.r_cfg_scale
-        if e_cfg_scale is None: e_cfg_scale = self.opt.e_cfg_scale
-        sample = self.sample(data, a_cfg_scale = a_cfg_scale, r_cfg_scale = r_cfg_scale, e_cfg_scale = e_cfg_scale, emo = emo, nfe = nfe, seed = seed)
+        if a_cfg_scale is None:
+            a_cfg_scale = self.opt.a_cfg_scale
+        if r_cfg_scale is None:
+            r_cfg_scale = self.opt.r_cfg_scale
+        if e_cfg_scale is None:
+            e_cfg_scale = self.opt.e_cfg_scale
+        sample = self.sample(data, a_cfg_scale=a_cfg_scale, r_cfg_scale=r_cfg_scale, e_cfg_scale=e_cfg_scale, emo=emo,
+                             nfe=nfe, seed=seed)
 
         self.first_run = False
 
-        return self.decode_latent_into_processed_images(s_r = s_r, s_r_feats = s_r_feats, r_d = sample)
+        return self.decode_latent_into_processed_images(s_r=s_r, s_r_feats=s_r_feats, r_d=sample)
 
 
-
-
-################ Condition Encoders ################
+#
+# ################ Condition Encoders ################
+#
 class AudioEncoder(BaseModel):
     def __init__(self, opt):
         super().__init__()
@@ -268,7 +272,7 @@ class AudioEncoder(BaseModel):
         self.num_frames_for_clip = int(opt.wav2vec_sec * self.opt.fps)
         self.num_prev_frames = int(opt.num_prev_frames)
 
-        self.wav2vec2 = Wav2VecModel.from_pretrained(opt.wav2vec_model_path, local_files_only = True)
+        self.wav2vec2 = Wav2VecModel.from_pretrained(opt.wav2vec_model_path, local_files_only=True)
         self.wav2vec2.feature_extractor._freeze_parameters()
 
         for name, param in self.wav2vec2.named_parameters():
@@ -282,8 +286,8 @@ class AudioEncoder(BaseModel):
             nn.SiLU()
             )
 
-    def get_wav2vec2_feature(self, a: torch.Tensor, seq_len:int) -> torch.Tensor:
-        a = self.wav2vec2(a, seq_len=seq_len, output_hidden_states = not self.only_last_features)
+    def get_wav2vec2_feature(self, a: torch.Tensor, seq_len: int) -> torch.Tensor:
+        a = self.wav2vec2(a, seq_len=seq_len, output_hidden_states=not self.only_last_features)
         if self.only_last_features:
             a = a.last_hidden_state
         else:
@@ -291,38 +295,38 @@ class AudioEncoder(BaseModel):
             a = a.reshape(a.shape[0], a.shape[1], -1)
         return a
 
-    def forward(self, a:torch.Tensor, prev_a:torch.Tensor = None) -> torch.Tensor:
+    def forward(self, a: torch.Tensor, prev_a: torch.Tensor = None) -> torch.Tensor:
         if prev_a is not None:
-            a = torch.cat([prev_a, a], dim = 1)
-            if a.shape[1] % int( (self.num_frames_for_clip + self.num_prev_frames) * self.opt.sampling_rate / self.opt.fps) != 0:
-                a = F.pad(a, (0, int((self.num_frames_for_clip + self.num_prev_frames) * self.opt.sampling_rate / self.opt.fps) - a.shape[1]), mode='replicate')
-            a = self.get_wav2vec2_feature(a, seq_len = self.num_frames_for_clip + self.num_prev_frames)
+            a = torch.cat([prev_a, a], dim=1)
+            if a.shape[1] % int((self.num_frames_for_clip + self.num_prev_frames) *
+                                self.opt.sampling_rate / self.opt.fps) != 0:
+                a = F.pad(a, (0, int((self.num_frames_for_clip + self.num_prev_frames) *
+                                     self.opt.sampling_rate / self.opt.fps) - a.shape[1]), mode='replicate')
+            a = self.get_wav2vec2_feature(a, seq_len=self.num_frames_for_clip + self.num_prev_frames)
         else:
-            if a.shape[1] % int( self.num_frames_for_clip * self.opt.sampling_rate / self.opt.fps) != 0:
-                a = F.pad(a, (0, int(self.num_frames_for_clip * self.opt.sampling_rate / self.opt.fps) - a.shape[1]), mode = 'replicate')
-            a = self.get_wav2vec2_feature(a, seq_len = self.num_frames_for_clip)
+            if a.shape[1] % int(self.num_frames_for_clip * self.opt.sampling_rate / self.opt.fps) != 0:
+                a = F.pad(a, (0, int(self.num_frames_for_clip * self.opt.sampling_rate / self.opt.fps) - a.shape[1]),
+                          mode='replicate')
+            a = self.get_wav2vec2_feature(a, seq_len=self.num_frames_for_clip)
 
-        return self.audio_projection(a) # frame by frame
+        return self.audio_projection(a)  # frame by frame
 
     @torch.no_grad()
-    def inference(self, a: torch.Tensor, seq_len:int) -> torch.Tensor:
+    def inference(self, a: torch.Tensor, seq_len: int) -> torch.Tensor:
         if a.shape[1] % int(seq_len * self.opt.sampling_rate / self.opt.fps) != 0:
-            a = F.pad(a, (0, int(seq_len * self.opt.sampling_rate / self.opt.fps) - a.shape[1]), mode = 'replicate')
+            a = F.pad(a, (0, int(seq_len * self.opt.sampling_rate / self.opt.fps) - a.shape[1]), mode='replicate')
         a = self.get_wav2vec2_feature(a, seq_len=seq_len)
         return self.audio_projection(a)
-
 
 
 class Audio2Emotion(nn.Module):
     def __init__(self, opt):
         super().__init__()
-        self.wav2vec2_for_emotion = Wav2Vec2ForSpeechClassification.from_pretrained(opt.audio2emotion_path, local_files_only=True)
+        self.wav2vec2_for_emotion = Wav2Vec2ForSpeechClassification.from_pretrained(opt.audio2emotion_path,
+                                                                                    local_files_only=True)
         self.wav2vec2_for_emotion.eval()
-
         # seven labels
-        self.id2label = {0: "angry", 1: "disgust", 2: "fear", 3: "happy",
-                        4: "neutral", 5: "sad", 6: "surprise"}
-
+        self.id2label = {0: "angry", 1: "disgust", 2: "fear", 3: "happy", 4: "neutral", 5: "sad", 6: "surprise"}
         self.label2id = {v: k for k, v in self.id2label.items()}
 
     @torch.no_grad()
@@ -331,5 +335,3 @@ class Audio2Emotion(nn.Module):
             a = torch.cat([prev_a, a], dim=1)
         logits = self.wav2vec2_for_emotion.forward(a).logits
         return F.softmax(logits, dim=1)     # scores
-
-#######################################################

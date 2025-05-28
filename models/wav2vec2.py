@@ -6,7 +6,7 @@ from transformers.modeling_outputs import BaseModelOutput
 
 class Wav2VecModel(Wav2Vec2Model):
     """
-    Wav2VecModel is a custom model class that extends the Wav2Vec2Model class from the transformers library. 
+    Wav2VecModel is a custom model class that extends the Wav2Vec2Model class from the transformers library.
     It inherits all the functionality of the Wav2Vec2Model and adds additional methods for feature extraction and encoding.
     ...
 
@@ -16,13 +16,14 @@ class Wav2VecModel(Wav2Vec2Model):
     Methods:
         forward(input_values, seq_len, attention_mask=None, mask_time_indices=None
         , output_attentions=None, output_hidden_states=None, return_dict=None):
-            Forward pass of the Wav2VecModel. 
+            Forward pass of the Wav2VecModel.
             It takes input_values, seq_len, and other optional parameters as input and returns the output of the base model.
 
         feature_extract(input_values, seq_len):
             Extracts features from the input_values using the base model.
 
-        encode(extract_features, attention_mask=None, mask_time_indices=None, output_attentions=None, output_hidden_states=None, return_dict=None):
+        encode(extract_features, attention_mask=None, mask_time_indices=None, output_attentions=None,
+               output_hidden_states=None, return_dict=None):
             Encodes the extracted features using the base model and returns the encoded features.
     """
     def forward(
@@ -69,9 +70,7 @@ class Wav2VecModel(Wav2Vec2Model):
             )
 
         hidden_states, extract_features = self.feature_projection(extract_features)
-        hidden_states1 = self._mask_hidden_states(
-            hidden_states, mask_time_indices=mask_time_indices, attention_mask=attention_mask
-        )
+        self._mask_hidden_states(hidden_states, mask_time_indices=mask_time_indices, attention_mask=attention_mask)
 
         encoder_outputs = self.encoder(
             hidden_states,

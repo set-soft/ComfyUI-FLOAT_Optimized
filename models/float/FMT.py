@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from ..basemodel import BaseModel
 
 
-def enc_dec_mask(T, S, frame_width = 1, expansion = 2):
+def enc_dec_mask(T, S, frame_width=1, expansion=2):
     mask = torch.ones(T, S)
     for i in range(T):
         mask[i, max(0, (i - expansion) * frame_width):(i + expansion + 1) * frame_width] = 0
@@ -31,7 +31,8 @@ def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
     sinusoid_table = torch.Tensor([get_posi_angle_vec(pos_i) for pos_i in range(n_position)])
     sinusoid_table[:, 0::2] = torch.sin(sinusoid_table[:, 0::2])  # dim 2i
     sinusoid_table[:, 1::2] = torch.cos(sinusoid_table[:, 1::2])  # dim 2i+1
-    if padding_idx is not None: sinusoid_table[padding_idx] = 0.
+    if padding_idx is not None:
+        sinusoid_table[padding_idx] = 0.
     return sinusoid_table
 
 
@@ -70,7 +71,7 @@ class Attention(nn.Module):
         if self.fused_attn:
             x = F.scaled_dot_product_attention(
                 q, k, v,
-                attn_mask = ~mask,
+                attn_mask=~mask,
                 dropout_p=self.attn_drop.p if self.training else 0.,
             )
         else:
@@ -85,11 +86,12 @@ class Attention(nn.Module):
         x = self.proj_drop(x)
         return x
 
+
 class TimestepEmbedder(nn.Module):
     """
     Embeds scalar timesteps into vector representations.
     """
-    def __init__(self, hidden_size, frequency_embedding_size = 256):
+    def __init__(self, hidden_size, frequency_embedding_size=256):
         super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(frequency_embedding_size, hidden_size, bias=True),
@@ -124,6 +126,7 @@ class TimestepEmbedder(nn.Module):
         t_emb = self.mlp(t_freq)
         return t_emb
 
+
 class SequenceEmbed(nn.Module):
     def __init__(
             self,
@@ -151,7 +154,7 @@ class FMTBlock(nn.Module):
         self.attn = Attention(hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs)
         self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
-        approx_gelu = lambda: nn.GELU(approximate="tanh")
+        def approx_gelu(): return nn.GELU(approximate="tanh")
         self.mlp = Mlp(in_features=hidden_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
         self.adaLN_modulation = nn.Sequential(
             nn.SiLU(),
@@ -164,9 +167,10 @@ class FMTBlock(nn.Module):
     def forward(self, x, c, mask=None) -> torch.Tensor:
         assert mask is not None
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=-1)
-        x = x + gate_msa * self.attn(self.framewise_modulate(self.norm1(x), shift_msa, scale_msa), mask = mask)
+        x = x + gate_msa * self.attn(self.framewise_modulate(self.norm1(x), shift_msa, scale_msa), mask=mask)
         x = x + gate_mlp * self.mlp(self.framewise_modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
+
 
 class Decoder(nn.Module):
     """
@@ -217,14 +221,15 @@ class FlowMatchingTransformer(BaseModel):
         self.c_embedder = nn.Linear(opt.dim_w + opt.dim_a + opt.dim_e, self.hidden_size)
 
         # define FMT blocks
-        self.blocks = nn.ModuleList([FMTBlock(self.hidden_size, self.num_heads, mlp_ratio=self.mlp_ratio) for _ in range(self.fmt_depth)])
+        self.blocks = nn.ModuleList([FMTBlock(self.hidden_size, self.num_heads, mlp_ratio=self.mlp_ratio)
+                                     for _ in range(self.fmt_depth)])
         self.decoder = Decoder(self.hidden_size, self.opt.dim_w)
         self.initialize_weights()
 
         # define alignment mask
-        alignment_mask = enc_dec_mask(self.num_total_frames, self.num_total_frames, 1, expansion=opt.attention_window).to(opt.rank)
+        alignment_mask = enc_dec_mask(self.num_total_frames, self.num_total_frames, 1,
+                                      expansion=opt.attention_window).to(opt.rank)
         self.register_buffer('alignment_mask', alignment_mask)
-
 
     def initialize_weights(self) -> None:
         def _basic_init(module):
@@ -263,7 +268,7 @@ class FlowMatchingTransformer(BaseModel):
             sequence[batch_id_for_drop] = 0
         return sequence
 
-    def forward(self, t, x, wa, wr, we, prev_x = None, prev_wa = None, train = True, **kwargs) -> torch.Tensor:
+    def forward(self, t, x, wa, wr, we, prev_x=None, prev_wa=None, train=True, **kwargs) -> torch.Tensor:
         """
         Forward pass of ConditionalFlowMatchingTransformer.
 
@@ -283,13 +288,13 @@ class FlowMatchingTransformer(BaseModel):
         t = self.t_embedder(t).unsqueeze(1)     # (N, D)
 
         # condition encoding
-        wa = self.sequence_embedder(wa, dropout_prob = self.opt.audio_dropout_prob, train=train)
-        wr = self.sequence_embedder(wr.unsqueeze(1), dropout_prob = self.opt.ref_dropout_prob, train=train)
-        we = self.sequence_embedder(we, dropout_prob = self.opt.emotion_dropout_prob, train=train)
+        wa = self.sequence_embedder(wa, dropout_prob=self.opt.audio_dropout_prob, train=train)
+        wr = self.sequence_embedder(wr.unsqueeze(1), dropout_prob=self.opt.ref_dropout_prob, train=train)
+        we = self.sequence_embedder(we, dropout_prob=self.opt.emotion_dropout_prob, train=train)
 
         # previous condition encoding
         if prev_x is not None:
-            prev_x  = self.sequence_embedder(prev_x,  dropout_prob=0.5, train=train)
+            prev_x = self.sequence_embedder(prev_x,  dropout_prob=0.5, train=train)
             prev_wa = self.sequence_embedder(prev_wa, dropout_prob=0.5, train=train)
 
             x = torch.cat([prev_x, x], dim=1)
@@ -311,18 +316,19 @@ class FlowMatchingTransformer(BaseModel):
         return self.decoder(x, c)
 
     @torch.no_grad()
-    def forward_with_cfv(self, t, x, wa, wr, we, prev_x, prev_wa, a_cfg_scale=1.0, r_cfg_scale=1.0, e_cfg_scale=1.0, **kwargs) -> torch.Tensor:
+    def forward_with_cfv(self, t, x, wa, wr, we, prev_x, prev_wa, a_cfg_scale=1.0, r_cfg_scale=1.0, e_cfg_scale=1.0,
+                         **kwargs) -> torch.Tensor:
         if a_cfg_scale != 1.0 or r_cfg_scale != 1.0 or e_cfg_scale != 1.0:
             null_wa = torch.zeros_like(wa)
             null_we = torch.zeros_like(we)
-            null_wr = torch.zeros_like(wr)
+            # null_wr = torch.zeros_like(wr)
 
-            audio_cat   = torch.cat([null_wa, wa, wa], dim=0)           # concat along batch
-            ref_cat     = torch.cat([wr, wr, wr], dim=0)                # concat along batch
-            emotion_cat = torch.cat([null_we, we, null_we], dim=0)      # concat along batch
-            x           = torch.cat([x, x, x], dim=0)                   # concat along batch
+            audio_cat = torch.cat([null_wa, wa, wa], dim=0)           # concat along batch
+            ref_cat = torch.cat([wr, wr, wr], dim=0)                  # concat along batch
+            emotion_cat = torch.cat([null_we, we, null_we], dim=0)    # concat along batch
+            x = torch.cat([x, x, x], dim=0)                           # concat along batch
 
-            prev_x_cat  = torch.cat([prev_x, prev_x, prev_x], dim=0)
+            prev_x_cat = torch.cat([prev_x, prev_x, prev_x], dim=0)
             prev_wa_cat = torch.cat([prev_wa, prev_wa, prev_wa], dim=0)
 
             model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, train=False)
@@ -331,4 +337,4 @@ class FlowMatchingTransformer(BaseModel):
             # Classifier-free vector field (cfv) incremental manner
             return uncond + a_cfg_scale * (audio_uncond_emotion - uncond) + e_cfg_scale * (all_cond - audio_uncond_emotion)
         else:
-            return self.forward(t, x, wa, wr, we, prev_x, prev_wa, train = False)
+            return self.forward(t, x, wa, wr, we, prev_x, prev_wa, train=False)

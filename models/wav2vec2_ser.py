@@ -98,15 +98,15 @@ class Wav2Vec2ForSpeechClassification(Wav2Vec2PreTrainedModel):
                 else:
                     self.config.problem_type = "multi_label_classification"
 
-            if self.config.problem_type == "regression":
-                loss_fct = MSELoss()
-                loss = loss_fct(logits.view(-1, self.num_labels), labels)
-            elif self.config.problem_type == "single_label_classification":
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-            elif self.config.problem_type == "multi_label_classification":
-                loss_fct = BCEWithLogitsLoss()
-                loss = loss_fct(logits, labels)
+        #    if self.config.problem_type == "regression":
+        #        loss_fct = MSELoss()
+        #        loss = loss_fct(logits.view(-1, self.num_labels), labels)
+        #    elif self.config.problem_type == "single_label_classification":
+        #        loss_fct = CrossEntropyLoss()
+        #        loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+        #    elif self.config.problem_type == "multi_label_classification":
+        #        loss_fct = BCEWithLogitsLoss()
+        #        loss = loss_fct(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[2:]

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 def dict_to_obj(d):
     return json.loads(json.dumps(d), object_hook=lambda d: SimpleNamespace(**d))
 
+
 # use custom dictionary instead of original parser for arguments
 BaseOptionsJson = dict_to_obj({
   "pretrained_dir": "./checkpoints",

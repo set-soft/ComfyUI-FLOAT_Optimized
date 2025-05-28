@@ -18,8 +18,7 @@ def upfirdn2d_native(input, kernel, up_x, up_y, down_x, down_y, pad_x0, pad_x1, 
     out = out.view(-1, minor, in_h * up_y, in_w * up_x)
 
     out = F.pad(out, [max(pad_x0, 0), max(pad_x1, 0), max(pad_y0, 0), max(pad_y1, 0)])
-    out = out[:, :, max(-pad_y0, 0): out.shape[2] - max(-pad_y1, 0),
-          max(-pad_x0, 0): out.shape[3] - max(-pad_x1, 0), ]
+    out = out[:, :, max(-pad_y0, 0): out.shape[2] - max(-pad_y1, 0), max(-pad_x0, 0): out.shape[3] - max(-pad_x1, 0), ]
 
     out = out.reshape([-1, 1, in_h * up_y + pad_y0 + pad_y1, in_w * up_x + pad_x0 + pad_x1])
     w = torch.flip(kernel, [0, 1]).view(1, 1, kernel_h, kernel_w)
@@ -66,6 +65,7 @@ class MotionPixelNorm(nn.Module):
 
     def forward(self, input):
         return input * torch.rsqrt(torch.mean(input ** 2, dim=2, keepdim=True) + 1e-8)
+
 
 class Upsample(nn.Module):
     def __init__(self, kernel, factor=2):
@@ -409,7 +409,7 @@ class ToFlow(nn.Module):
 
         sampler = torch.tanh(out[:, 0:2, :, :])
         mask = torch.sigmoid(out[:, 2:3, :, :])
-        flow = sampler.permute(0, 2, 3, 1) + xs     # B x h x w 2 
+        flow = sampler.permute(0, 2, 3, 1) + xs     # B x h x w 2
         feat_warp = F.grid_sample(feat, flow, align_corners=False) * mask
 
         return feat_warp, feat_warp + input * (1.0 - mask), out, flow
@@ -485,8 +485,6 @@ class Synthesis(nn.Module):
         self.n_latent = self.log_size * 2 - 2
 
     def forward(self, wa, alpha, feats):
-        bs = wa.shape[0]
-
         if alpha is not None:
             if len(alpha) > 1:
                 directions_target = self.direction(alpha[0])  # target
@@ -515,48 +513,7 @@ class Synthesis(nn.Module):
                 skip = to_rgb(out_warp)
             elif out.size(2) == 64:
                 out_warp, out, skip_flow, flow = to_flow(out, latent[:, i + 2], feat, skip_flow)
-                skip = to_rgb(out_warp, skip)                
-            else:
-                out_warp, out, skip_flow, _ = to_flow(out, latent[:, i + 2], feat, skip_flow)
                 skip = to_rgb(out_warp, skip)
-            i += 2
-
-        img = skip
-
-        return img, flow
-
-    def synthesis(self, wa, feats):
-        bs = wa.shape[0]
-
-        if alpha is not None:
-            if len(alpha) > 1:
-                directions_target = self.direction(alpha[0])  # target
-                directions_source = self.direction(alpha[1])  # source
-                directions_start = self.direction(alpha[2])  # start
-                latent = wa + (directions_target - directions_start) + directions_source
-            else:
-                directions = self.direction(alpha[0])
-                latent = wa + directions  # wa + directions
-        else:
-            latent = wa
-
-        inject_index = self.n_latent
-        latent = latent.unsqueeze(1).repeat(1, inject_index, 1)
-
-        out = self.input(latent)
-        out = self.conv1(out, latent[:, 0])
-
-        i = 1
-        for conv1, conv2, to_rgb, to_flow, feat in zip(self.convs[::2], self.convs[1::2], self.to_rgbs,
-                                                       self.to_flows, feats):
-            out = conv1(out, latent[:, i])
-            out = conv2(out, latent[:, i + 1])
-            if out.size(2) == 8:
-                out_warp, out, skip_flow, _ = to_flow(out, latent[:, i + 2], feat)
-                skip = to_rgb(out_warp)
-            elif out.size(2) == 64:
-                out_warp, out, skip_flow, flow = to_flow(out, latent[:, i + 2], feat, skip_flow)
-                skip = to_rgb(out_warp, skip)                
             else:
                 out_warp, out, skip_flow, _ = to_flow(out, latent[:, i + 2], feat, skip_flow)
                 skip = to_rgb(out_warp, skip)

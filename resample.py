@@ -83,62 +83,62 @@ def resample_audio_numpy(audio_data_numpy: np.ndarray, original_sr: int, target_
 
 
 def comfy_audio_to_librosa_mono(comfy_audio_tensor: torch.Tensor, cur_sr: int, target_sr: int) -> np.ndarray:
-	"""
-	Converts a ComfyUI audio tensor to a mono NumPy array suitable for Librosa.
+    """
+    Converts a ComfyUI audio tensor to a mono NumPy array suitable for Librosa.
 
-	Args:
-	    comfy_audio_tensor (torch.Tensor):
-	        The input audio tensor from ComfyUI.
-	        Expected shape: (batch_size, channels, num_samples).
-	        Typically batch_size is 1.
+    Args:
+        comfy_audio_tensor (torch.Tensor):
+            The input audio tensor from ComfyUI.
+            Expected shape: (batch_size, channels, num_samples).
+            Typically batch_size is 1.
 
-	Returns:
-	    np.ndarray:
-	        A mono audio waveform as a NumPy array with shape (num_samples,).
-	"""
-	if not isinstance(comfy_audio_tensor, torch.Tensor):
-		raise TypeError(f"Input must be a PyTorch Tensor, got {type(comfy_audio_tensor)}")
+    Returns:
+        np.ndarray:
+            A mono audio waveform as a NumPy array with shape (num_samples,).
+    """
+    if not isinstance(comfy_audio_tensor, torch.Tensor):
+        raise TypeError(f"Input must be a PyTorch Tensor, got {type(comfy_audio_tensor)}")
 
-	if comfy_audio_tensor.ndim != 3:
-		raise ValueError(
-			f"Expected a 3D tensor (batch_size, channels, num_samples), "
-			f"but got {comfy_audio_tensor.ndim}D tensor with shape {comfy_audio_tensor.shape}")
+    if comfy_audio_tensor.ndim != 3:
+        raise ValueError(
+            f"Expected a 3D tensor (batch_size, channels, num_samples), "
+            f"but got {comfy_audio_tensor.ndim}D tensor with shape {comfy_audio_tensor.shape}")
 
-	# 1. Handle batch dimension: Assume we process the first item if batch_size > 1
-	#    or just squeeze if batch_size is indeed 1.
-	if comfy_audio_tensor.shape[0] > 1:
-		print(f"Warning: Input tensor has batch_size {comfy_audio_tensor.shape[0]}. "
-			  "Processing only the first audio in the batch.")
-		audio_tensor = comfy_audio_tensor[0]  # Shape: (channels, num_samples)
-	else:
-		audio_tensor = comfy_audio_tensor.squeeze(0)  # Shape: (channels, num_samples)
+    # 1. Handle batch dimension: Assume we process the first item if batch_size > 1
+    #    or just squeeze if batch_size is indeed 1.
+    if comfy_audio_tensor.shape[0] > 1:
+        print(f"Warning: Input tensor has batch_size {comfy_audio_tensor.shape[0]}. "
+              "Processing only the first audio in the batch.")
+        audio_tensor = comfy_audio_tensor[0]  # Shape: (channels, num_samples)
+    else:
+        audio_tensor = comfy_audio_tensor.squeeze(0)  # Shape: (channels, num_samples)
 
-	# 2. Move to CPU (if it's on GPU) and convert to NumPy
-	#    Librosa operates on NumPy arrays on the CPU.
-	waveform_np = audio_tensor.cpu().numpy()  # Shape: (channels, num_samples)
+    # 2. Move to CPU (if it's on GPU) and convert to NumPy
+    #    Librosa operates on NumPy arrays on the CPU.
+    waveform_np = audio_tensor.cpu().numpy()  # Shape: (channels, num_samples)
 
-	# 3. Convert to mono if it's not already
-	#    waveform_np has shape (channels, num_samples)
-	#    librosa.to_mono expects a 2D array (channels, n_samples) or 1D (n_samples)
-	#    If it's already (1, num_samples), librosa.to_mono will correctly make it (num_samples,)
-	if waveform_np.ndim == 1: # Already mono (e.g. if squeeze(0) made it 1D from (1,1,N))
-		mono_waveform_np = waveform_np
-	elif waveform_np.shape[0] == 1: # Explicitly mono with channel dimension
-		mono_waveform_np = waveform_np[0, :]
-	elif waveform_np.shape[0] > 1: # Stereo or multi-channel
-		mono_waveform_np = librosa.to_mono(waveform_np)
-	else: # Should not happen if input validation is correct
-		raise ValueError(f"Unexpected waveform shape after processing: {waveform_np.shape}")
+    # 3. Convert to mono if it's not already
+    #    waveform_np has shape (channels, num_samples)
+    #    librosa.to_mono expects a 2D array (channels, n_samples) or 1D (n_samples)
+    #    If it's already (1, num_samples), librosa.to_mono will correctly make it (num_samples,)
+    if waveform_np.ndim == 1:  # Already mono (e.g. if squeeze(0) made it 1D from (1,1,N))
+        mono_waveform_np = waveform_np
+    elif waveform_np.shape[0] == 1:  # Explicitly mono with channel dimension
+        mono_waveform_np = waveform_np[0, :]
+    elif waveform_np.shape[0] > 1:  # Stereo or multi-channel
+        mono_waveform_np = librosa.to_mono(waveform_np)
+    else:  # Should not happen if input validation is correct
+        raise ValueError(f"Unexpected waveform shape after processing: {waveform_np.shape}")
 
-	# Ensure it's float32, which librosa typically uses, though to_mono usually preserves float type.
-	if mono_waveform_np.dtype != np.float32:
-		mono_waveform_np = mono_waveform_np.astype(np.float32)
+    # Ensure it's float32, which librosa typically uses, though to_mono usually preserves float type.
+    if mono_waveform_np.dtype != np.float32:
+        mono_waveform_np = mono_waveform_np.astype(np.float32)
 
-	# Make the sample rate match the model training data, Wav2Vec needs 16k
-	if cur_sr != target_sr:
-		mono_waveform_np = resample_audio_numpy(mono_waveform_np, cur_sr, target_sr)
+    # Make the sample rate match the model training data, Wav2Vec needs 16k
+    if cur_sr != target_sr:
+        mono_waveform_np = resample_audio_numpy(mono_waveform_np, cur_sr, target_sr)
 
-	return mono_waveform_np
+    return mono_waveform_np
 
 
 # --- Example Usage ---

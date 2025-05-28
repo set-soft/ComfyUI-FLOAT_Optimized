@@ -38,8 +38,6 @@ class BaseModel(torch.nn.Module):
     def forward(self):
         raise NotImplementedError()
 
-
-
 # def linear_interpolation(features, seq_len):
 #     features = features.transpose(1, 2)
 #     output_features = F.interpolate(features, size=seq_len, align_corners=True, mode='linear')
@@ -165,11 +163,9 @@ class BaseModel(torch.nn.Module):
 #         )
 
 
-
-
-
 def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
+
 
 def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
@@ -238,7 +234,7 @@ class SEBottleneck(nn.Module):
                  *, reduction=16):
         super(SEBottleneck, self).__init__()
         if norm_layer is None:
-            norm_layer= nn.BatchNorm2d
+            norm_layer = nn.BatchNorm2d
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = norm_layer(planes)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
@@ -394,8 +390,6 @@ class ResNet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
-
-
 
 
 def se_resnet18(num_classes=1000, norm_layer=None):
