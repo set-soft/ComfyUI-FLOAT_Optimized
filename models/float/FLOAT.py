@@ -5,6 +5,7 @@
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
 from comfy.utils import ProgressBar
+import logging
 import math
 import torch
 import torch.nn as nn
@@ -17,6 +18,8 @@ from ...models.wav2vec2_ser import Wav2Vec2ForSpeechClassification
 from ...models.basemodel import BaseModel
 from .generator import Generator
 from .FMT import FlowMatchingTransformer
+
+logger = logging.getLogger("ComfyUI.FLOAT_Nodes.FLOAT")
 
 
 # ######## Main Phase 2 model ########
@@ -51,6 +54,11 @@ class FLOAT(BaseModel):
             'rtol': self.opt.ode_rtol,
             'method': self.opt.torchdiffeq_ode_method
         }
+        logger.debug('Simplified architecture')
+        self.print_architecture()
+        if logger.getEffectiveLevel() < logging.DEBUG:
+            logger.debug('Full architecture')
+            self.print_architecture(max_depth=-1)
 
     # ######## Motion Encoder - Decoder ########
     @torch.no_grad()
@@ -291,6 +299,7 @@ class AudioEncoder(BaseModel):
             nn.LayerNorm(opt.dim_w),
             nn.SiLU()
             )
+        self.print_architecture()
 
     def get_wav2vec2_feature(self, a: torch.Tensor, seq_len: int) -> torch.Tensor:
         a = self.wav2vec2(a, seq_len=seq_len, output_hidden_states=not self.only_last_features)

@@ -21,12 +21,14 @@ float_logger = logging.getLogger("ComfyUI.FLOAT_Nodes")
 comfy_root_logger = logging.getLogger('comfy')
 effective_comfy_level = logging.getLogger().getEffectiveLevel()
 # 2. Check your custom environment variable for more verbosity
-float_nodes_debug_env = os.environ.get("FLOAT_NODES_DEBUG", "0")
-is_float_debug_requested = (float_nodes_debug_env == "1")
+try:
+    float_nodes_debug_env = int(os.environ.get("FLOAT_NODES_DEBUG", "0"))
+except ValueError:
+    float_nodes_debug_env = 0
 # 3. Set node's logger level
-if is_float_debug_requested:
-    float_logger.setLevel(logging.DEBUG)
-    final_level_str = "DEBUG (due to FLOAT_NODES_DEBUG=1)"
+if float_nodes_debug_env:
+    float_logger.setLevel(logging.DEBUG - (float_nodes_debug_env - 1))
+    final_level_str = f"DEBUG (due to FLOAT_NODES_DEBUG={float_nodes_debug_env})"
 else:
     float_logger.setLevel(effective_comfy_level)
     final_level_str = logging.getLevelName(effective_comfy_level) + " (matching ComfyUI global)"

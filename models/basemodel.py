@@ -2,35 +2,86 @@
 # Copyright (c) 2025 DeepBrain AI Research
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
+import logging
 import torch
 import torch.nn as nn
 
 from torch import Tensor
 from typing import Type, Callable, Union, List, Optional
 
+logger = logging.getLogger("ComfyUI.FLOAT_Nodes.basemodel")
+
+
+# Helper function (if you don't have it elsewhere)
+def num2str(num, precision=2):
+    """Convert number to human-readable string, e.g., 1.23M, 5.6K, 789."""
+    if not num:
+        return "N/A"
+    if abs(num) >= 1e6:
+        return f"{num / 1e6:.{precision}f} M"
+    elif abs(num) >= 1e3:
+        return f"{num / 1e3:.{precision}f} K"
+    else:
+        return str(int(num)) if num == int(num) else f"{num:.{precision}f}"
+
 
 class BaseModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-    def print_architecture(self, verbose=False):
-        name = type(self).__name__
-        result = '-------------------%s---------------------\n' % name
-        total_num_params = 0
-        for i, (name, child) in enumerate(self.named_children()):
+    def _print_recursive(self, module, prefix, depth, verbose, result_list, max_depth):
+        """
+        Recursive helper function to print module architecture.
+        - module: current nn.Module to inspect
+        - prefix: name of this module (e.g., 'encoder.layer1')
+        - depth: current recursion depth for indentation
+        - verbose: flag to print details
+        - result_list: list to append formatted strings to
+        - max_depth: how deep we should go, -1 is infinite
+        """
+        if max_depth >= 0 and depth >= max_depth:
+            return
+        indent = "  " * depth  # Indentation based on depth
+
+        # Calculate parameters for the current module and all its sub-modules
+        current_module_total_params = sum(p.numel() for p in module.parameters())
+
+        if verbose:
+            # Add the line for the current module
+            # The prefix here is the name given to 'module' by its parent
+            result_list.append(f"{indent}- {prefix}: {num2str(current_module_total_params)}")
+
+        # Iterate over the direct children of the current module
+        for name, child in module.named_children():
+            if 'loss' in name:  # Skip 'loss' modules as before
+                continue
+            # Recursively call for each child
+            # The child's parameters will be summed up in its own recursive call
+            self._print_recursive(child, name, depth + 1, verbose, result_list, max_depth)
+
+    def print_architecture(self, verbose=True, max_depth=2):
+        if logger.getEffectiveLevel() > logging.DEBUG:
+            return
+        class_name = type(self).__name__
+        result_lines = [f'## {class_name}']
+
+        # Calculate total parameters for the entire model once
+        # self.parameters() is inherently recursive and gets all parameters.
+        total_num_params = sum(p.numel() for p in self.parameters())
+
+        # Iterate over the direct children of the main model (self)
+        for name, child in self.named_children():
             if 'loss' in name:
                 continue
-            num_params = sum([p.numel() for p in child.parameters()])
-            total_num_params += num_params
-            if verbose:
-                result += "%s: %3.3fM\n" % (name, (num_params / 1e6))
-            for i, (name, grandchild) in enumerate(child.named_children()):
-                num_params = sum([p.numel() for p in grandchild.parameters()])
-                if verbose:
-                    result += "\t%s: %3.3fM\n" % (name, (num_params / 1e6))
-        result += '[Network %s] Total number of parameters : %.3f M\n' % (name, total_num_params / 1e6)
-        result += '-----------------------------------------------\n'
-        print(result)
+
+            # Call the recursive helper for each top-level child
+            # These top-level children will be at depth 0 for their own line,
+            # and their children will start at depth 1 relative to them.
+            self._print_recursive(child, name, 0, verbose, result_lines, max_depth)
+
+        result_lines.append(f'\nTotal number of parameters : {num2str(total_num_params)}')
+        result_lines.append('\n\n')
+        logger.info("\n".join(result_lines))
 
     def set_requires_grad(self, requires_grad):
         for param in self.parameters():

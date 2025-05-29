@@ -7,8 +7,11 @@
 # Audio resampler and mono conversion using librosa
 # Gemini 2.5 Pro code
 import librosa
+import logging
 import numpy as np
 import torch
+
+logger = logging.getLogger("ComfyUI.FLOAT_Nodes.resample")
 
 
 def resample_audio_numpy(audio_data_numpy: np.ndarray, original_sr: int, target_sr: int,
@@ -32,11 +35,11 @@ def resample_audio_numpy(audio_data_numpy: np.ndarray, original_sr: int, target_
         np.ndarray: The resampled audio data with the same number of channels as input.
     """
     if original_sr == target_sr:
-        print(f"Original sample rate ({original_sr} Hz) is already the target sample rate ({target_sr} Hz)."
-              " No resampling needed.")
+        logger.debug(f"Original sample rate ({original_sr} Hz) is already the target sample rate ({target_sr} Hz)."
+                     " No resampling needed.")
         return audio_data_numpy
 
-    print(f"Resampling from {original_sr} Hz to {target_sr} Hz using '{res_type}'...")
+    logger.debug(f"Resampling from {original_sr} Hz to {target_sr} Hz using '{res_type}'...")
 
     # librosa.resample works best with floating point audio between -1 and 1.
     # If your NumPy array is integer type (e.g., int16 from a WAV file),
@@ -63,8 +66,8 @@ def resample_audio_numpy(audio_data_numpy: np.ndarray, original_sr: int, target_
         num_channels = audio_data_numpy.shape[0]
         # Heuristic: if many "channels" and few "samples", it might be transposed
         if num_channels > audio_data_numpy.shape[1] and num_channels > 16:
-            print(f"Warning: Input shape {audio_data_numpy.shape} might be (samples, channels) instead of "
-                  "(channels, samples). Transposing for resampling.")
+            logger.warning(f"Warning: Input shape {audio_data_numpy.shape} might be (samples, channels) instead of "
+                           "(channels, samples). Transposing for resampling.")
             audio_data_numpy_transposed = audio_data_numpy.T
             resampled_channels = []
             for ch_idx in range(audio_data_numpy_transposed.shape[0]):  # Iterate over transposed channels
@@ -84,7 +87,7 @@ def resample_audio_numpy(audio_data_numpy: np.ndarray, original_sr: int, target_
     else:
         raise ValueError(f"Unsupported audio_data_numpy ndim: {audio_data_numpy.ndim}. Expected 1 or 2.")
 
-    print(f"Resampling complete. Original shape: {audio_data_numpy.shape}, New shape: {resampled_audio.shape}")
+    logger.debug(f"Resampling complete. Original shape: {audio_data_numpy.shape}, New shape: {resampled_audio.shape}")
     return resampled_audio
 
 
@@ -113,8 +116,8 @@ def comfy_audio_to_librosa_mono(comfy_audio_tensor: torch.Tensor, cur_sr: int, t
     # 1. Handle batch dimension: Assume we process the first item if batch_size > 1
     #    or just squeeze if batch_size is indeed 1.
     if comfy_audio_tensor.shape[0] > 1:
-        print(f"Warning: Input tensor has batch_size {comfy_audio_tensor.shape[0]}. "
-              "Processing only the first audio in the batch.")
+        logger.warning(f"Warning: Input tensor has batch_size {comfy_audio_tensor.shape[0]}. "
+                       "Processing only the first audio in the batch.")
         audio_tensor = comfy_audio_tensor[0]  # Shape: (channels, num_samples)
     else:
         audio_tensor = comfy_audio_tensor.squeeze(0)  # Shape: (channels, num_samples)
@@ -155,30 +158,30 @@ if __name__ == '__main__':
     num_samples_original = original_sample_rate * duration_seconds
 
     # Mono example
-    print("--- Mono Resampling Example ---")
+    logger.info("--- Mono Resampling Example ---")
     # Create a sine wave as mono audio
     frequency_mono = 440  # A4 note
     t_mono = np.linspace(0, duration_seconds, num_samples_original, endpoint=False)
     mono_audio = 0.5 * np.sin(2 * np.pi * frequency_mono * t_mono)
-    print(f"Original mono audio shape: {mono_audio.shape}, SR: {original_sample_rate} Hz")
+    logger.info(f"Original mono audio shape: {mono_audio.shape}, SR: {original_sample_rate} Hz")
 
     # Resample mono audio to 44100 Hz
     target_sr_44100 = 44100
     resampled_mono_44100 = resample_audio_numpy(mono_audio, original_sample_rate, target_sr_44100)
     # Expected number of samples: num_samples_original * (target_sr / original_sr)
     expected_samples_44100 = int(num_samples_original * (target_sr_44100 / original_sample_rate))
-    print(f"Resampled mono to {target_sr_44100} Hz, shape: {resampled_mono_44100.shape} "
-          f"(expected ~{expected_samples_44100} samples)")
+    logger.info(f"Resampled mono to {target_sr_44100} Hz, shape: {resampled_mono_44100.shape} "
+                f"(expected ~{expected_samples_44100} samples)")
     assert abs(resampled_mono_44100.shape[0] - expected_samples_44100) < 2  # Allow for small rounding in length
 
     # Resample mono audio back to original SR (e.g., 22050 Hz from 44100 Hz)
     resampled_mono_back = resample_audio_numpy(resampled_mono_44100, target_sr_44100, original_sample_rate)
-    print(f"Resampled mono back to {original_sample_rate} Hz, shape: {resampled_mono_back.shape}"
-          f" (expected {num_samples_original} samples)")
+    logger.info(f"Resampled mono back to {original_sample_rate} Hz, shape: {resampled_mono_back.shape}"
+                f" (expected {num_samples_original} samples)")
     assert abs(resampled_mono_back.shape[0] - num_samples_original) < 2
 
     # Stereo example
-    print("\n--- Stereo Resampling Example ---")
+    logger.info("\n--- Stereo Resampling Example ---")
     # Create two sine waves for stereo
     frequency_left = 440
     frequency_right = 660
@@ -186,14 +189,14 @@ if __name__ == '__main__':
     left_channel = 0.5 * np.sin(2 * np.pi * frequency_left * t_stereo)
     right_channel = 0.3 * np.sin(2 * np.pi * frequency_right * t_stereo)
     stereo_audio = np.stack((left_channel, right_channel), axis=0)  # Shape: (2, num_samples_original)
-    print(f"Original stereo audio shape: {stereo_audio.shape}, SR: {original_sample_rate} Hz")
+    logger.info(f"Original stereo audio shape: {stereo_audio.shape}, SR: {original_sample_rate} Hz")
 
     # Resample stereo audio to 48000 Hz
     target_sr_48000 = 48000
     resampled_stereo_48000 = resample_audio_numpy(stereo_audio, original_sample_rate, target_sr_48000)
     expected_samples_48000 = int(num_samples_original * (target_sr_48000 / original_sample_rate))
-    print(f"Resampled stereo to {target_sr_48000} Hz, shape: {resampled_stereo_48000.shape}"
-          f" (expected (2, ~{expected_samples_48000}) samples)")
+    logger.info(f"Resampled stereo to {target_sr_48000} Hz, shape: {resampled_stereo_48000.shape}"
+                f" (expected (2, ~{expected_samples_48000}) samples)")
     assert resampled_stereo_48000.shape[0] == 2
     assert abs(resampled_stereo_48000.shape[1] - expected_samples_48000) < 2
 
@@ -202,12 +205,12 @@ if __name__ == '__main__':
     target_sr_again_44100 = 44100
     resampled_stereo_again = resample_audio_numpy(resampled_stereo_48000, target_sr_48000, target_sr_again_44100)
     expected_samples_again = int(resampled_stereo_48000.shape[1] * (target_sr_again_44100 / target_sr_48000))
-    print(f"Resampled stereo from {target_sr_48000} Hz to {target_sr_again_44100} Hz, "
-          f"shape: {resampled_stereo_again.shape} (expected (2, ~{expected_samples_again}) samples)")
+    logger.info(f"Resampled stereo from {target_sr_48000} Hz to {target_sr_again_44100} Hz, "
+                f"shape: {resampled_stereo_again.shape} (expected (2, ~{expected_samples_again}) samples)")
     assert resampled_stereo_again.shape[0] == 2
     assert abs(resampled_stereo_again.shape[1] - expected_samples_again) < 2
 
     # Test with target SR same as original
-    print("\n--- Test No Resampling Needed ---")
+    logger.info("\n--- Test No Resampling Needed ---")
     no_resample_needed = resample_audio_numpy(mono_audio, original_sample_rate, original_sample_rate)
     assert np.array_equal(mono_audio, no_resample_needed)

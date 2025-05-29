@@ -12,6 +12,7 @@ import cv2
 from comfy.utils import ProgressBar
 import face_alignment
 import librosa
+import logging
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -20,6 +21,8 @@ from typing import Union, Dict
 
 from .models.float.FLOAT import FLOAT
 from .resample import comfy_audio_to_librosa_mono
+
+logger = logging.getLogger("ComfyUI.FLOAT_Nodes.generate")
 
 
 class CustomTransform:
@@ -111,8 +114,8 @@ class DataProcessor:
         # ComfyUI image tensors are typically (batch, height, width, channels)
         if comfy_image_tensor.ndim == 4:
             if comfy_image_tensor.shape[0] != 1:
-                print(f"Warning: Input tensor has batch_size {comfy_image_tensor.shape[0]}. "
-                      "default_img_loader is processing only the first image.")
+                logger.warning(f"Warning: Input tensor has batch_size {comfy_image_tensor.shape[0]}. "
+                               "default_img_loader is processing only the first image.")
             img_tensor_hwc = comfy_image_tensor[0]  # Shape: (H, W, C)
         elif comfy_image_tensor.ndim == 3:  # Assuming (H, W, C)
             img_tensor_hwc = comfy_image_tensor
