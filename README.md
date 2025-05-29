@@ -84,12 +84,30 @@ You can download the file to a folder named `models/float` inside your ComfyUI i
 
 ### Load Float Models (Opt)
 
-- *model*: This is just informative, currently shows the name of the "model" `float.pth`
-- *target_device*: Selects the inference device. Might be useful if you have more than one GPU.
-- *cudnn_benchmark*: When enabled CUDA will try to find the best algorithm to run the inference steps.
+- **model**: This is just informative, currently shows the name of the "model" `float.pth`
+- **target_device**: Selects the inference device. Might be useful if you have more than one GPU.
+- **cudnn_benchmark**: When enabled CUDA will try to find the best algorithm to run the inference steps.
   The drawback is that this makes the first inference run very slow.
   For this reason the default value is disabled. This is much better for RTX3060 systems.
   If you find enabling it is better for your system please report it.
+
+### Float Process (Opt)
+
+- **ref_image**: Image to apply the voice. Use a square image. The net was trained using 512x512 images,
+  so your image will be rescaled to this size. Use simple backgrounds for better results. Leave enough
+  space around the face to allow for head motion.
+- **ref_audio**: The voice to use. If this is a song try removing the music. The model can detect emotions,
+  but it was trained for english. The length of the generated video is the same of the audio. Longer audios
+  will need more memory.
+- **float_pipe**: Connect the `Load Float Models (Opt)` node here.
+- **fps**: Frames Per Second, 25 fps is fine, 30 will probably sync better with your screen. Higher FPSs
+  will need more memory.
+- **emotion**: Can be used to shift the emotion of the reference image.
+- **face_align**: When enabled the image will be processed to detect the face and ensure the space around
+  it is suitable for head motion.
+- **seed**: random seed for the generation, change it to get different videos.
+- **control after generate**: added by ComfyUI to choose what to do after a generation. Use *fixed* to
+  keep the same **seed**, allowing repetitibility.
 
 ## &#128030; Debugging
 
