@@ -2,7 +2,7 @@
 
 # ComfyUI FLOAT Optimized
 
-[![arXiv](https://img.shields.io/badge/arXiv%20paper-2412.09013-b31b1b.svg)](https://arxiv.org/abs/2412.01064) 
+[![arXiv](https://img.shields.io/badge/arXiv%20paper-2412.09013-b31b1b.svg)](https://arxiv.org/abs/2412.01064)
 [![by-nc-sa/4.0](https://img.shields.io/badge/license-CC--BY--NC--SA--4.0-lightgrey)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en)
 
 </div>
@@ -18,7 +18,7 @@ The code was optimized to reduce VRAM usage and avoid temporal files.
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/36626b4a-d3e5-4db9-87a7-ca0e949daee0" />
-</div> 
+</div>
 
 
 ## 🚀 Installation
@@ -35,20 +35,20 @@ Note:
 
 ## ☀️ Usage
 
-- Load [example workflow](float_workflow.json) 
+- Load [example workflow](float_workflow.json)
 - Upload driving image and audio, click queue.
   You can get the image originally used from [here](https://raw.githubusercontent.com/deepbrainai-research/float/refs/heads/main/assets/sam_altman_512x512.jpg),
   and the audio from [here](https://github.com/deepbrainai-research/float/raw/refs/heads/main/assets/aud-sample-vs-1.wav)
 - Models autodownload to `/ComfyUI/models/float`.
   But you can also download them manually.
 
-## &#128190; Manual models download
+### &#128190; Manual models download
 
 Models are automatically downloaded, but you can also download them manually.
 This is for advanced use, not usually needed.
 Three *models* are needed.
 
-### Wav2Vec 2.0
+#### Wav2Vec 2.0
 
 This is an audio encoder used as base for speech recognition. Was created by FaceBook AI.
 You can download the files to a folder named `models/audio/wav2vec2-base-960h` inside your ComfyUI installation.
@@ -58,7 +58,7 @@ Note that you don't need to include *pytorch_model.bin* or *tf_model.h5*, you ju
 - License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
 - Paper: https://huggingface.co/papers/2006.11477
 
-### Speech Emotion Recognition
+#### Speech Emotion Recognition
 
 This is what FLOAT uses to detect the emotion in the audio, uses Wav2Vec 2.0 as base.
 Well, in fact is based on another net that uses Wav2Vec ([Base](https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-english))
@@ -68,7 +68,7 @@ You can download the files to a folder named `models/audio/wav2vec-english-speec
 - License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
 - Paper: doi 10.57967/hf/3569 (for the base speech recognition model)
 
-### FLOAT
+#### FLOAT
 
 This is the main model.
 You can download the file to a folder named `models/float` inside your ComfyUI installation.
@@ -77,6 +77,17 @@ You can download the file to a folder named `models/float` inside your ComfyUI i
         [download 1](https://drive.google.com/file/d/1rvWuM12cyvNvBQNCLmG4Fr2L1rpjQBF0/view?pli=1)
         [download 2](https://huggingface.co/yuvraj108c/float/resolve/main/float.pth?download=true)
 - License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
+
+## Debugging
+
+When you face problems you can ask these nodes to show more information.
+
+- You can just run ComfyUI using `--verbose DEBUG`.
+  This will show extra information for *all* the ComfyUI operations
+- If you just want extra information for these nodes you can define the `FLOAT_NODES_DEBUG` environment variable to `1`.
+  This will show extra information related to FLOAT nodes.
+
 
 ## Citation of the paper
 

@@ -4,6 +4,7 @@
 # Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
+import logging
 import os
 import torch
 import folder_paths
@@ -11,6 +12,26 @@ import comfy.model_management as mm
 
 from .generate import InferenceAgent
 from .options.base_options import BaseOptions
+
+# ######################
+# Logger setup
+# ######################
+# 1. Determine the ComfyUI global log level (influenced by --verbose)
+float_logger = logging.getLogger("ComfyUI.FLOAT_Nodes")
+comfy_root_logger = logging.getLogger('comfy')
+effective_comfy_level = logging.getLogger().getEffectiveLevel()
+# 2. Check your custom environment variable for more verbosity
+float_nodes_debug_env = os.environ.get("FLOAT_NODES_DEBUG", "0")
+is_float_debug_requested = (float_nodes_debug_env == "1")
+# 3. Set node's logger level
+if is_float_debug_requested:
+    float_logger.setLevel(logging.DEBUG)
+    final_level_str = "DEBUG (due to FLOAT_NODES_DEBUG=1)"
+else:
+    float_logger.setLevel(effective_comfy_level)
+    final_level_str = logging.getLevelName(effective_comfy_level) + " (matching ComfyUI global)"
+_initial_setup_logger = logging.getLogger(__name__ + ".setup")  # A temporary logger for this message
+_initial_setup_logger.info(f"FLOAT_Nodes logger level set to: {final_level_str}")
 
 # List of fixed-step solvers you from torchdiffeq
 TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
