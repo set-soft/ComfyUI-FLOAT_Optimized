@@ -66,6 +66,7 @@ class LoadFloatModels:
             "required": {
                 "model": (['float.pth'],),
                 "target_device": (device_options, {"default": default_device}),
+                "cudnn_benchmark": ("BOOLEAN", {"default": False}, ),
             },
             "optional": {
                 "advanced_float_options": ("ADV_FLOAT_DICT",)
@@ -78,7 +79,7 @@ class LoadFloatModels:
     CATEGORY = "FLOAT"
     DESCRIPTION = "Models are auto-downloaded to /ComfyUI/models/float"
 
-    def loadmodel(self, model, target_device, advanced_float_options=None):
+    def loadmodel(self, model, target_device, cudnn_benchmark, advanced_float_options=None):
         # download models if not exist
         float_models_dir = os.path.join(folder_paths.models_dir, "float")
         os.makedirs(float_models_dir, exist_ok=True)
@@ -94,13 +95,13 @@ class LoadFloatModels:
             alt_dir = os.path.join(audio_models_dir, "wav2vec2-base-960h")
             if os.path.isdir(alt_dir):
                 wav2vec2_base_960h_models_dir = alt_dir
-                print("Using speech encoder from: "+alt_dir)
+                float_logger.debug("Using speech encoder from: "+alt_dir)
         # Allow models/audio/wav2vec-english-speech-emotion-recognition
         if not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir):
             alt_dir = os.path.join(audio_models_dir, "wav2vec-english-speech-emotion-recognition")
             if os.path.isdir(alt_dir):
                 wav2vec_english_speech_emotion_recognition_models_dir = alt_dir
-                print("Using emotion decoder from: "+alt_dir)
+                float_logger.debug("Using emotion decoder from: "+alt_dir)
 
         float_model_path = os.path.join(float_models_dir, "float.pth")
 
@@ -118,6 +119,7 @@ class LoadFloatModels:
                     setattr(opt, key, value)
 
         opt.rank = torch.device(target_device)
+        opt.cudnn_benchmark = cudnn_benchmark
         opt.ckpt_path = float_model_path
         opt.pretrained_dir = float_models_dir
         opt.wav2vec_model_path = wav2vec2_base_960h_models_dir
@@ -151,16 +153,35 @@ class FloatProcess:
     DESCRIPTION = "Float Processing"
 
     def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, e_cfg_scale, fps, emotion, face_align, seed):
-        float_pipe.G.to(float_pipe.rank)
 
-        float_pipe.opt.fps = fps
-        images_bhwc = float_pipe.run_inference(None, ref_image, ref_audio, a_cfg_scale=a_cfg_scale,
-                                               r_cfg_scale=float_pipe.opt.r_cfg_scale, e_cfg_scale=e_cfg_scale,
-                                               emo=None if emotion == "none" else emotion,
-                                               no_crop=not face_align, seed=seed)
-        float_pipe.G.to(mm.unet_offload_device())
+        original_cudnn_benchmark_state = None
+        is_cuda_device = float_pipe.opt.rank.type == 'cuda'
 
-        return (images_bhwc,)
+        try:
+            if is_cuda_device and hasattr(torch.backends, 'cudnn') and torch.backends.cudnn.is_available():
+                # Store original state and set new state
+                original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
+                torch.backends.cudnn.benchmark = float_pipe.opt.cudnn_benchmark_enabled
+                float_logger.debug(f"FloatProcess: Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}"
+                                   " (was {original_cudnn_benchmark_state})")
+            else:
+                float_logger.debug("FloatProcess: Not a CUDA device or cuDNN not available, benchmark setting skipped.")
+
+            float_pipe.G.to(float_pipe.rank)
+
+            float_pipe.opt.fps = fps
+            images_bhwc = float_pipe.run_inference(None, ref_image, ref_audio, a_cfg_scale=a_cfg_scale,
+                                                   r_cfg_scale=float_pipe.opt.r_cfg_scale, e_cfg_scale=e_cfg_scale,
+                                                   emo=None if emotion == "none" else emotion,
+                                                   no_crop=not face_align, seed=seed)
+            float_pipe.G.to(mm.unet_offload_device())
+
+            return (images_bhwc,)
+        finally:
+            # Restore original cuDNN benchmark state
+            if original_cudnn_benchmark_state is not None:
+                torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
+                float_logger.debug(f"FloatProcess: Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
 
 
 class FloatAdvancedParameters:

@@ -79,6 +79,17 @@ You can download the file to a folder named `models/float` inside your ComfyUI i
 - License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
 
+## Nodes
+
+### Load Float Models (Opt)
+
+- *model*: This is just informative, currently shows the name of the "model" `float.pth`
+- *target_device*: Selects the inference device. Might be useful if you have more than one GPU.
+- *cudnn_benchmark*: When enabled CUDA will try to find the best algorithm to run the inference steps.
+  The drawback is that this makes the first inference run very slow.
+  For this reason the default value is disabled. This is much better for RTX3060 systems.
+  If you find enabling it is better for your system please report it.
+
 ## Debugging
 
 When you face problems you can ask these nodes to show more information.
