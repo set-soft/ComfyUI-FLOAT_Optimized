@@ -79,7 +79,7 @@ You can download the file to a folder named `models/float` inside your ComfyUI i
 - License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
 
-## Nodes
+## &#128218; Nodes
 
 ### Load Float Models (Opt)
 
@@ -90,7 +90,7 @@ You can download the file to a folder named `models/float` inside your ComfyUI i
   For this reason the default value is disabled. This is much better for RTX3060 systems.
   If you find enabling it is better for your system please report it.
 
-## Debugging
+## &#128030; Debugging
 
 When you face problems you can ask these nodes to show more information.
 
@@ -100,7 +100,7 @@ When you face problems you can ask these nodes to show more information.
   This will show extra information related to FLOAT nodes.
 
 
-## Citation of the paper
+## &#128279; Citation of the paper
 
 ```bibtex
 @article{ki2024float,
@@ -125,6 +125,6 @@ When you face problems you can ask these nodes to show more information.
 - **Base FLOAT nodes for ComfyUI** by Yuvraj Seegolam [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 - **Optimizations** by Salvador E. Tropea [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
-## License
+## &#65039; License
 
 [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
