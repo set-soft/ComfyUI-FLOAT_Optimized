@@ -125,6 +125,6 @@ When you face problems you can ask these nodes to show more information.
 - **Base FLOAT nodes for ComfyUI** by Yuvraj Seegolam [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 - **Optimizations** by Salvador E. Tropea [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
-## &#65039; License
+## ©️  License
 
 [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
