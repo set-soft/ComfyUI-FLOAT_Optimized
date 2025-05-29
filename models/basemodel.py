@@ -60,6 +60,9 @@ class BaseModel(torch.nn.Module):
             self._print_recursive(child, name, depth + 1, verbose, result_list, max_depth)
 
     def print_architecture(self, verbose=True, max_depth=2):
+        """ Print the neural network architecture.
+            Is just for debug purposes.
+            It shows how much parameters has each layer """
         if logger.getEffectiveLevel() > logging.DEBUG:
             return
         class_name = type(self).__name__
