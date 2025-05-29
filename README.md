@@ -32,6 +32,7 @@ pip install -r requirements.txt
 Note:
 - The code uses `torch` which is installed for ComfyUI, is part of its dependencies.
   This dependency isn't listed to avoid messing with it, which delicated.
+- I tested the nodes using an RTX3060 with 12 GB of VRAM and 32 GB of RAM, in addition I have 32 GB of swap (virtual RAM).
 
 ## ☀️ Usage
 
