@@ -97,7 +97,8 @@ Three *models* are needed.
 
 ### Load Float Models (Opt)
 
-- **model**: This is just informative, currently shows the name of the "model" `float.pth`
+- **model**: Shows the models in `models/float`. Currently you can choose between `FLOAT.safetensors` (unified) and `float.pth`
+  The default is `FLOAT.safetensors`, if the file isn't there it will be downloaded.
 - **target_device**: Selects the inference device. Might be useful if you have more than one GPU.
 - **cudnn_benchmark**: When enabled CUDA will try to find the best algorithm to run the inference steps.
   The drawback is that this makes the first inference run very slow.
