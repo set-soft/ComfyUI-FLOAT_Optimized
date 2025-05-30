@@ -43,13 +43,29 @@ Note:
 - Models autodownload to `/ComfyUI/models/float`.
   But you can also download them manually.
 
+> [!IMPORTANT]
+> If models are automatically downloaded you'll see the workflow stopped at the "Load Float Models (Opt)" for a while.
+> Look into the ComfyUI console for more information.
+> It will have to download 2.4 GB
+
 ### &#128190; Manual models download
 
 Models are automatically downloaded, but you can also download them manually.
 This is for advanced use, not usually needed.
+There are two ways to do it.
+
+#### Simple
+
+Just download the unified [FLOAT model](https://huggingface.co/set-soft/float/resolve/main/FLOAT.safetensors?download=true)
+to a folder named `models/float` inside your ComfyUI installation.
+
+This file (2.4 GiB) contains the weights for all the networks used by FLOAT.
+
+#### Flexible
+
 Three *models* are needed.
 
-#### Wav2Vec 2.0
+##### Wav2Vec 2.0
 
 This is an audio encoder used as base for speech recognition. Was created by FaceBook AI.
 You can download the files to a folder named `models/audio/wav2vec2-base-960h` inside your ComfyUI installation.
@@ -59,7 +75,7 @@ Note that you don't need to include *pytorch_model.bin* or *tf_model.h5*, you ju
 - License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
 - Paper: https://huggingface.co/papers/2006.11477
 
-#### Speech Emotion Recognition
+##### Speech Emotion Recognition
 
 This is what FLOAT uses to detect the emotion in the audio, uses Wav2Vec 2.0 as base.
 Well, in fact is based on another net that uses Wav2Vec ([Base](https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-english))
@@ -69,7 +85,7 @@ You can download the files to a folder named `models/audio/wav2vec-english-speec
 - License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
 - Paper: doi 10.57967/hf/3569 (for the base speech recognition model)
 
-#### FLOAT
+##### FLOAT
 
 This is the main model.
 You can download the file to a folder named `models/float` inside your ComfyUI installation.

@@ -7,15 +7,17 @@
 from comfy.utils import ProgressBar
 import logging
 import math
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchdiffeq import odeint
 from tqdm import tqdm
+from transformers import Wav2Vec2Config
 
-from ...models.wav2vec2 import Wav2VecModel
-from ...models.wav2vec2_ser import Wav2Vec2ForSpeechClassification
-from ...models.basemodel import BaseModel
+from ..wav2vec2 import Wav2VecModel
+from ..wav2vec2_ser import Wav2Vec2ForSpeechClassification
+from ..basemodel import BaseModel
 from .generator import Generator
 from .FMT import FlowMatchingTransformer
 
@@ -24,7 +26,7 @@ logger = logging.getLogger("ComfyUI.FLOAT_Nodes.FLOAT")
 
 # ######## Main Phase 2 model ########
 class FLOAT(BaseModel):
-    def __init__(self, opt):
+    def __init__(self, opt, node_root_path="."):
         super().__init__()
         self.opt = opt
         self.first_run = True
@@ -39,9 +41,32 @@ class FLOAT(BaseModel):
         pbar.update(1)
 
         # condition encoders
-        self.audio_encoder = AudioEncoder(opt)
+        if node_root_path is not None:
+            # Don't load weights, just the configs
+            full_wav2vec_config_path = os.path.join(node_root_path, opt.wav2vec_config_path, 'config.json')
+            full_emotion_config_path = os.path.join(node_root_path, opt.emotion_ser_config_path, 'config.json')
+
+            if not os.path.exists(full_wav2vec_config_path):
+                raise FileNotFoundError(f"Wav2Vec2 base config not found: {full_wav2vec_config_path}")
+            audio_enc_config = Wav2Vec2Config.from_json_file(full_wav2vec_config_path)
+            logger.info(f"Initializing AudioEncoder with config from: {full_wav2vec_config_path}")
+
+            if not os.path.exists(full_emotion_config_path):
+                raise FileNotFoundError(f"Speech Emotion Recognition config not found: {full_emotion_config_path}")
+            emotion_enc_config = Wav2Vec2Config.from_json_file(full_emotion_config_path)
+            # Ensure num_labels is in the config for Wav2Vec2ForSpeechClassification
+            if not hasattr(emotion_enc_config, 'num_labels'):
+                num_labels_from_id2label = len(emotion_enc_config.id2label) if hasattr(emotion_enc_config, 'id2label') else 7
+                emotion_enc_config.num_labels = num_labels_from_id2label
+                logger.debug(f"num_labels not in emotion_enc_config, set to {num_labels_from_id2label} based on id2label or "
+                             "default.")
+            logger.debug(f"Initializing Audio2Emotion with config from: {full_emotion_config_path}")
+        else:
+            # Load weights and configs
+            audio_enc_config = emotion_enc_config = None
+        self.audio_encoder = AudioEncoder(opt, config=audio_enc_config)
         pbar.update(1)
-        self.emotion_encoder = Audio2Emotion(opt)
+        self.emotion_encoder = Audio2Emotion(opt, config=emotion_enc_config)
         pbar.update(1)
 
         # FMT; Flow Matching Transformer
@@ -278,7 +303,7 @@ class FLOAT(BaseModel):
 # ################ Condition Encoders ################
 #
 class AudioEncoder(BaseModel):
-    def __init__(self, opt):
+    def __init__(self, opt, config: Wav2Vec2Config = None):
         super().__init__()
         self.opt = opt
         self.only_last_features = opt.only_last_features
@@ -286,13 +311,28 @@ class AudioEncoder(BaseModel):
         self.num_frames_for_clip = int(opt.wav2vec_sec * self.opt.fps)
         self.num_prev_frames = int(opt.num_prev_frames)
 
-        self.wav2vec2 = Wav2VecModel.from_pretrained(opt.wav2vec_model_path, local_files_only=True)
+        if config is not None:
+            logger.debug(f"AudioEncoder: Initializing Wav2VecModel with provided config (hidden_size: {config.hidden_size})")
+            self.wav2vec2 = Wav2VecModel(config)  # Initialize with config
+            # Determine audio_input_dim based on config and opt.only_last_features
+            if opt.only_last_features:
+                audio_input_dim = config.hidden_size
+            else:
+                # hidden_states[0] is input embeddings, so actual transformer layers are hidden_states[1:]
+                # Number of transformer layers in Wav2Vec2Config is num_hidden_layers
+                num_transformer_layers = config.num_hidden_layers
+                audio_input_dim = num_transformer_layers * config.hidden_size
+        else:
+            # Load with weights
+            logger.debug(f"AudioEncoder: Initializing from {opt.wav2vec_model_path}")
+            self.wav2vec2 = Wav2VecModel.from_pretrained(opt.wav2vec_model_path, local_files_only=True)
+            audio_input_dim = 768 if opt.only_last_features else 12 * 768
+        logger.debug(f"AudioEncoder: audio_input_dim set to {audio_input_dim}")
+
         self.wav2vec2.feature_extractor._freeze_parameters()
 
-        for name, param in self.wav2vec2.named_parameters():
+        for name, param in self.wav2vec2.named_parameters():  # Freeze all wav2vec2 params
             param.requires_grad = False
-
-        audio_input_dim = 768 if opt.only_last_features else 12 * 768
 
         self.audio_projection = nn.Sequential(
             nn.Linear(audio_input_dim, opt.dim_w),
@@ -335,13 +375,20 @@ class AudioEncoder(BaseModel):
 
 
 class Audio2Emotion(BaseModel):
-    def __init__(self, opt):
+    def __init__(self, opt, config: Wav2Vec2Config = None):
         super().__init__()
-        self.wav2vec2_for_emotion = Wav2Vec2ForSpeechClassification.from_pretrained(opt.audio2emotion_path,
-                                                                                    local_files_only=True)
+        if config is not None:
+            logger.debug(f"Audio2Emotion: Initializing Wav2Vec2ForSpeechClassification with provided config "
+                         f"(num_labels: {config.num_labels})")
+            self.wav2vec2_for_emotion = Wav2Vec2ForSpeechClassification(config)
+            self.id2label = config.id2label
+        else:
+            logger.debug(f"Audio2Emotion: Initializing from {opt.audio2emotion_path}")
+            self.wav2vec2_for_emotion = Wav2Vec2ForSpeechClassification.from_pretrained(opt.audio2emotion_path,
+                                                                                        local_files_only=True)
+            self.id2label = {0: "angry", 1: "disgust", 2: "fear", 3: "happy", 4: "neutral", 5: "sad", 6: "surprise"}
         self.wav2vec2_for_emotion.eval()
-        # seven labels
-        self.id2label = {0: "angry", 1: "disgust", 2: "fear", 3: "happy", 4: "neutral", 5: "sad", 6: "surprise"}
+
         self.label2id = {v: k for k, v in self.id2label.items()}
         self.print_architecture()
 

@@ -13,6 +13,7 @@ from comfy.utils import ProgressBar
 import face_alignment
 import librosa
 import logging
+import os
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -39,7 +40,7 @@ class CustomTransform:
 
 
 class DataProcessor:
-    def __init__(self, opt):
+    def __init__(self, opt, node_root_path="."):
         self.opt = opt
         self.fps = opt.fps
         self.sampling_rate = opt.sampling_rate
@@ -48,7 +49,21 @@ class DataProcessor:
         self.fa = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, flip_input=False)
 
         # wav2vec2 audio preprocessor
-        self.wav2vec_preprocessor = Wav2Vec2FeatureExtractor.from_pretrained(opt.wav2vec_model_path, local_files_only=True)
+        if node_root_path is not None:
+            # Now load from bundled preprocessor_config.json
+            preprocessor_config_dir = os.path.join(node_root_path, opt.wav2vec_config_path)
+            preprocessor_config_full_path = os.path.join(preprocessor_config_dir, 'preprocessor_config.json')
+            if not os.path.exists(preprocessor_config_full_path):
+                msg = f"Preprocessor config not found: {preprocessor_config_full_path}"
+                logger.error(msg)
+                raise FileNotFoundError(msg)
+            logger.debug(f"Loading Wav2Vec2FeatureExtractor from bundled config: {preprocessor_config_full_path}")
+            dir_name = preprocessor_config_dir
+        else:
+            # From the same place where the model was loaded
+            logger.debug(f"Loading Wav2Vec2FeatureExtractor from {opt.wav2vec_model_path}")
+            dir_name = opt.wav2vec_model_path
+        self.wav2vec_preprocessor = Wav2Vec2FeatureExtractor.from_pretrained(dir_name, local_files_only=True)
 
         # image transform
         self.transform = CustomTransform(opt.input_size)
@@ -155,10 +170,11 @@ class DataProcessor:
 
 
 class InferenceAgent:
-    def __init__(self, opt):
+    def __init__(self, opt, node_root_path="."):
         torch.cuda.empty_cache()
         self.opt = opt
         self.rank = opt.rank
+        self.node_root_path = node_root_path
 
         # Load Model
         self.load_model()
@@ -167,25 +183,61 @@ class InferenceAgent:
         self.G.eval()
 
         # Load Data Processor
-        self.data_processor = DataProcessor(opt)
+        self.data_processor = DataProcessor(opt, node_root_path=self.node_root_path)
 
     def load_model(self) -> None:
-        self.G = FLOAT(self.opt)
+        self.G = FLOAT(self.opt, node_root_path=self.node_root_path)
 
     def load_weight(self, checkpoint_path: str, rank: int) -> None:
-        state_dict = torch.load(checkpoint_path, map_location='cpu', weights_only=True)
-        with torch.no_grad():
-            params = []
-            for model_name, model_param in self.G.named_parameters():
-                if model_name in state_dict:
-                    params.append((model_name, model_param))
-                else:
-                    assert "wav2vec2" in model_name  # wav2vec2 layers aren't in float.pth
-            pbar = ProgressBar(len(params))
-            for model_name, model_param in tqdm(params, 'Loading weights'):
-                model_param.copy_(state_dict[model_name].to(rank))
-                pbar.update(1)
-        del state_dict
+        if not os.path.exists(checkpoint_path):
+            msg = f"Checkpoint file not found: {checkpoint_path}"
+            logger.error(msg)
+            raise FileNotFoundError(msg)
+
+        if self.node_root_path is not None:
+            from safetensors.torch import load_file as load_safetensors
+            logger.debug(f"Loading weights from safetensors file: {checkpoint_path} directly to device: {rank}")
+            # Load directly to the target device if possible
+            try:
+                state_dict = load_safetensors(checkpoint_path, device=str(rank))
+            except Exception as e:
+                logger.error(f"Failed to load safetensors file '{checkpoint_path}': {e}")
+                logger.info("Attempting to load to CPU first then move.")
+                state_dict = load_safetensors(checkpoint_path, device="cpu")
+                # If loaded to CPU, individual parameters will be moved by load_state_dict or copy_
+
+            logger.debug(f"Applying {len(state_dict)} key-value pairs to model G.")
+            try:
+                missing_keys, unexpected_keys = self.G.load_state_dict(state_dict, strict=False)
+                if missing_keys:
+                    logger.warning(f"Missing keys in state_dict for G: {missing_keys}")
+                if unexpected_keys:
+                    logger.warning(f"Unexpected keys in state_dict for G: {unexpected_keys}")
+                if not missing_keys and not unexpected_keys:
+                    logger.debug("All keys matched successfully for model G.")
+            except RuntimeError as e:
+                logger.error(f"RuntimeError during G.load_state_dict: {e}")
+                logger.error("This might indicate a mismatch between saved weights and model architecture.")
+                raise
+            finally:
+                del state_dict  # Free memory
+                if 'cuda' in str(rank):
+                    torch.cuda.empty_cache()
+        else:
+            state_dict = torch.load(checkpoint_path, map_location='cpu', weights_only=True)
+
+            with torch.no_grad():
+                params = []
+                for model_name, model_param in self.G.named_parameters():
+                    if model_name in state_dict:
+                        params.append((model_name, model_param))
+                    else:
+                        assert "wav2vec2" in model_name  # wav2vec2 layers aren't in float.pth
+                pbar = ProgressBar(len(params))
+                for model_name, model_param in tqdm(params, 'Loading weights'):
+                    model_param.copy_(state_dict[model_name].to(rank))
+                    pbar.update(1)
+            del state_dict
 
     @torch.no_grad()
     def run_inference(
@@ -200,7 +252,6 @@ class InferenceAgent:
         nfe: int = 10,
         no_crop: bool = False,
         seed: int = 25,
-        verbose: bool = False
     ) -> str:
         data = self.data_processor.preprocess(ref_path, audio_path, no_crop=no_crop)
 

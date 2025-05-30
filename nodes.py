@@ -64,9 +64,18 @@ class LoadFloatModels:
         device_options = get_torch_device_options()
         default_device = "cuda" if "cuda" in device_options else "cpu"
 
+        float_models_path = os.path.join(folder_paths.models_dir, "float")
+        os.makedirs(float_models_path, exist_ok=True)
+
+        # Look for the combined safetensors file
+        available_model_files = sorted([f for f in os.listdir(float_models_path) if f.lower().endswith(".safetensors") or
+                                        f.lower().endswith(".pth")])
+        if not available_model_files:  # Provide a default if none found
+            available_model_files = [BaseOptions.ckpt_filename]  # Default from BaseOptions
+
         return {
             "required": {
-                "model": (['float.pth'],),
+                "model": (available_model_files, {"default": BaseOptions.ckpt_filename}),
                 "target_device": (device_options, {"default": default_device}),
                 "cudnn_benchmark": ("BOOLEAN", {"default": False}, ),
             },
@@ -82,35 +91,53 @@ class LoadFloatModels:
     DESCRIPTION = "Models are auto-downloaded to /ComfyUI/models/float"
 
     def loadmodel(self, model, target_device, cudnn_benchmark, advanced_float_options=None):
-        # download models if not exist
+        # Get the root path of this custom node package to locate bundled configs
+        node_root_path = os.path.dirname(os.path.abspath(__file__))
+        float_logger.debug(f"Node root path for bundled configs: {node_root_path}")
+
+        # Path to the selected combined model file
+        ckpt_full_path = os.path.join(folder_paths.models_dir, "float", model)
+        float_logger.info(f"Selected combined model file: {ckpt_full_path}")
         float_models_dir = os.path.join(folder_paths.models_dir, "float")
-        os.makedirs(float_models_dir, exist_ok=True)
 
-        audio_models_dir = os.path.join(folder_paths.models_dir, "audio")
+        if model.lower().endswith(".pth"):
+            # ##################################
+            # Old model with wav2vec separated
+            # ##################################
+            audio_models_dir = os.path.join(folder_paths.models_dir, "audio")
 
-        wav2vec2_base_960h_models_dir = os.path.join(float_models_dir, "wav2vec2-base-960h")
-        wav2vec_english_speech_emotion_recognition_models_dir = os.path.join(float_models_dir,
-                                                                             "wav2vec-english-speech-emotion-recognition")
+            wav2vec2_base_960h_models_dir = os.path.join(float_models_dir, "wav2vec2-base-960h")
+            wav2vec_english_speech_emotion_recognition_models_dir = os.path.join(float_models_dir,
+                                                                                 "wav2vec-english-speech-emotion-recognition")
 
-        # Allow models/audio/wav2vec2-base-960h
-        if not os.path.isdir(wav2vec2_base_960h_models_dir):
-            alt_dir = os.path.join(audio_models_dir, "wav2vec2-base-960h")
-            if os.path.isdir(alt_dir):
-                wav2vec2_base_960h_models_dir = alt_dir
-                float_logger.debug("Using speech encoder from: "+alt_dir)
-        # Allow models/audio/wav2vec-english-speech-emotion-recognition
-        if not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir):
-            alt_dir = os.path.join(audio_models_dir, "wav2vec-english-speech-emotion-recognition")
-            if os.path.isdir(alt_dir):
-                wav2vec_english_speech_emotion_recognition_models_dir = alt_dir
-                float_logger.debug("Using emotion decoder from: "+alt_dir)
+            # Allow models/audio/wav2vec2-base-960h
+            if not os.path.isdir(wav2vec2_base_960h_models_dir):
+                alt_dir = os.path.join(audio_models_dir, "wav2vec2-base-960h")
+                if os.path.isdir(alt_dir):
+                    wav2vec2_base_960h_models_dir = alt_dir
+                    float_logger.debug("Using speech encoder from: "+alt_dir)
+            # Allow models/audio/wav2vec-english-speech-emotion-recognition
+            if not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir):
+                alt_dir = os.path.join(audio_models_dir, "wav2vec-english-speech-emotion-recognition")
+                if os.path.isdir(alt_dir):
+                    wav2vec_english_speech_emotion_recognition_models_dir = alt_dir
+                    float_logger.debug("Using emotion decoder from: "+alt_dir)
 
-        float_model_path = os.path.join(float_models_dir, "float.pth")
+            if (not os.path.exists(ckpt_full_path) or not os.path.isdir(wav2vec2_base_960h_models_dir) or
+               not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir)):
+                from huggingface_hub import snapshot_download
+                snapshot_download(repo_id="yuvraj108c/float", local_dir=float_models_dir, local_dir_use_symlinks=False)
 
-        if (not os.path.exists(float_model_path) or not os.path.isdir(wav2vec2_base_960h_models_dir) or
-           not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir)):
-            from huggingface_hub import snapshot_download
-            snapshot_download(repo_id="yuvraj108c/float", local_dir=float_models_dir, local_dir_use_symlinks=False)
+            unified = False
+        else:
+            # ##############################
+            # Unified model (safetensors)
+            # ##############################
+            if not os.path.exists(ckpt_full_path):
+                float_logger.warning(f"Model file {ckpt_full_path} not found. Trying to download it ...")
+                from huggingface_hub import snapshot_download
+                snapshot_download(repo_id="set-soft/float", local_dir=float_models_dir)
+            unified = True
 
         # use custom dictionary instead of original parser for arguments
         opt = BaseOptions
@@ -121,12 +148,21 @@ class LoadFloatModels:
                     setattr(opt, key, value)
 
         opt.rank = torch.device(target_device)
+        float_logger.debug(f"Instantiating InferenceAgent for device {opt.rank}")
         opt.cudnn_benchmark = cudnn_benchmark
-        opt.ckpt_path = float_model_path
-        opt.pretrained_dir = float_models_dir
-        opt.wav2vec_model_path = wav2vec2_base_960h_models_dir
-        opt.audio2emotion_path = wav2vec_english_speech_emotion_recognition_models_dir
-        agent = InferenceAgent(opt)
+        opt.ckpt_path = ckpt_full_path
+        if not unified:
+            opt.pretrained_dir = float_models_dir
+            opt.wav2vec_model_path = wav2vec2_base_960h_models_dir
+            opt.audio2emotion_path = wav2vec_english_speech_emotion_recognition_models_dir
+            float_logger.debug(f"- Using {ckpt_full_path}, {wav2vec2_base_960h_models_dir} and "
+                               f"{wav2vec_english_speech_emotion_recognition_models_dir}")
+        else:
+            float_logger.debug(f"- Using combined model {opt.ckpt_path}")
+
+        agent = InferenceAgent(opt, node_root_path=node_root_path if unified else None)
+
+        float_logger.debug("FLOAT model pipe loaded successfully.")
 
         return (agent,)
 

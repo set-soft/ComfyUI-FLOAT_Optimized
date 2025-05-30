@@ -20,6 +20,9 @@ class BaseOptions:
     sampling_rate: int = 16000
     audio_marcing: int = 2
     wav2vec_sec: float = 2.0
+    wav2vec_config_path: str = "model_configs/wav2vec2_base"
+    emotion_ser_config_path: str = "model_configs/emotion_ser"
+    ckpt_filename: str = "FLOAT.safetensors"
     wav2vec_model_path: str = "./checkpoints/wav2vec2-base-960h"
     audio2emotion_path: str = "./checkpoints/wav2vec-english-speech-emotion-recognition"
     attention_window: int = 2

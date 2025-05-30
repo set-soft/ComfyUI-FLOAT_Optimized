@@ -2,6 +2,8 @@ opencv-python
 librosa
 torchdiffeq
 timm>=1.0.9
+huggingface_hub
+safetensors
 face_alignment
 transformers>=4
 tqdm
