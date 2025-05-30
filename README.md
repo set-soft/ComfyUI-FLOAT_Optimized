@@ -65,35 +65,32 @@ This file (2.4 GiB) contains the weights for all the networks used by FLOAT.
 
 Three *models* are needed.
 
-##### Wav2Vec 2.0
+1. Wav2Vec 2.0
 
-This is an audio encoder used as base for speech recognition. Was created by FaceBook AI.
-You can download the files to a folder named `models/audio/wav2vec2-base-960h` inside your ComfyUI installation.
-Note that you don't need to include *pytorch_model.bin* or *tf_model.h5*, you just need the JSON files and *model.safetensors*
+    This is an audio encoder used as base for speech recognition. Was created by FaceBook AI.
+    You can download the files to a folder named `models/audio/wav2vec2-base-960h` inside your ComfyUI installation.
+    Note that you don't need to include *pytorch_model.bin* or *tf_model.h5*, you just need the JSON files and *model.safetensors*
+    - Repo: [HuggingFace repo](https://huggingface.co/facebook/wav2vec2-base-960h).
+    - License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
+    - Paper: https://huggingface.co/papers/2006.11477
 
-- Repo: [HuggingFace repo](https://huggingface.co/facebook/wav2vec2-base-960h).
-- License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
-- Paper: https://huggingface.co/papers/2006.11477
+2. Speech Emotion Recognition
 
-##### Speech Emotion Recognition
+    This is what FLOAT uses to detect the emotion in the audio, uses Wav2Vec 2.0 as base.
+    Well, in fact is based on another net that uses Wav2Vec ([Base](https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-english))
+    You can download the files to a folder named `models/audio/wav2vec-english-speech-emotion-recognition` inside your ComfyUI installation.
+    - Repo: [HuggingFace repo](https://huggingface.co/r-f/wav2vec-english-speech-emotion-recognition).
+    - License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
+    - Paper: doi 10.57967/hf/3569 (for the base speech recognition model)
 
-This is what FLOAT uses to detect the emotion in the audio, uses Wav2Vec 2.0 as base.
-Well, in fact is based on another net that uses Wav2Vec ([Base](https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-english))
-You can download the files to a folder named `models/audio/wav2vec-english-speech-emotion-recognition` inside your ComfyUI installation.
+3. FLOAT
 
-- Repo: [HuggingFace repo](https://huggingface.co/r-f/wav2vec-english-speech-emotion-recognition).
-- License: [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
-- Paper: doi 10.57967/hf/3569 (for the base speech recognition model)
-
-##### FLOAT
-
-This is the main model.
-You can download the file to a folder named `models/float` inside your ComfyUI installation.
-
-- Repo: [GitHub page](https://github.com/deepbrainai-research/float)
-        [download 1](https://drive.google.com/file/d/1rvWuM12cyvNvBQNCLmG4Fr2L1rpjQBF0/view?pli=1)
-        [download 2](https://huggingface.co/yuvraj108c/float/resolve/main/float.pth?download=true)
-- License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+    This is the main model.
+    You can download the file to a folder named `models/float` inside your ComfyUI installation.
+    - Repo: [GitHub page](https://github.com/deepbrainai-research/float)
+            [download 1](https://drive.google.com/file/d/1rvWuM12cyvNvBQNCLmG4Fr2L1rpjQBF0/view?pli=1)
+            [download 2](https://huggingface.co/yuvraj108c/float/resolve/main/float.pth?download=true)
+    - License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
 
 ## &#128218; Nodes
