@@ -201,7 +201,7 @@ class FloatProcess:
                 original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
                 torch.backends.cudnn.benchmark = float_pipe.opt.cudnn_benchmark_enabled
                 float_logger.debug(f"FloatProcess: Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}"
-                                   " (was {original_cudnn_benchmark_state})")
+                                   f" (was {original_cudnn_benchmark_state})")
             else:
                 float_logger.debug("FloatProcess: Not a CUDA device or cuDNN not available, benchmark setting skipped.")
 
