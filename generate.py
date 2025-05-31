@@ -75,6 +75,10 @@ class DataProcessor:
         resized_img = cv2.resize(img, dsize=(0, 0), fx=mult, fy=mult, interpolation=cv2.INTER_AREA
                                  if mult < 1. else cv2.INTER_CUBIC)
         bboxes = self.fa.face_detector.detect_from_image(resized_img)
+        if not bboxes:
+            msg = "Failed to detect any face in the image, no face align performed"
+            logger.warning(msg)
+            return img
         bboxes = [(int(x1 / mult), int(y1 / mult), int(x2 / mult), int(y2 / mult), score)
                   for (x1, y1, x2, y2, score) in bboxes if score > 0.95]
         bboxes = bboxes[0]  # Just use first bbox
