@@ -5,12 +5,13 @@
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
 import logging
+import numpy as np
 import os
 import torch
 import folder_paths
 import comfy.model_management as mm
 
-from .generate import InferenceAgent
+from .generate import InferenceAgent, img_tensor_2_np_array, process_img
 from .options.base_options import BaseOptions
 
 # ######################
@@ -179,7 +180,8 @@ class FloatProcess:
                 "e_cfg_scale": ("FLOAT", {"default": 1.0, "min": 1.0, "step": 0.1}),
                 "fps": ("FLOAT", {"default": 25, "step": 1}),
                 "emotion": (['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise'], {"default": "none"}),
-                "face_align": ("BOOLEAN", {"default": False}, ),
+                "face_align": ("BOOLEAN", {"default": True}, ),
+                "face_margin": ("FLOAT", {"default": 1.6, "min": 1.2, "max": 2.0, "step": 0.1}),
                 "seed": ("INT", {"default": 62064758300528, "min": 0, "max": 0xffffffffffffffff}),
             },
         }
@@ -190,7 +192,8 @@ class FloatProcess:
     CATEGORY = "FLOAT"
     DESCRIPTION = "Float Processing"
 
-    def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, e_cfg_scale, fps, emotion, face_align, seed):
+    def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, e_cfg_scale, fps, emotion, face_align, face_margin,
+                     seed):
 
         original_cudnn_benchmark_state = None
         is_cuda_device = float_pipe.opt.rank.type == 'cuda'
@@ -211,7 +214,7 @@ class FloatProcess:
             images_bhwc = float_pipe.run_inference(None, ref_image, ref_audio, a_cfg_scale=a_cfg_scale,
                                                    r_cfg_scale=float_pipe.opt.r_cfg_scale, e_cfg_scale=e_cfg_scale,
                                                    emo=None if emotion == "none" else emotion,
-                                                   no_crop=not face_align, seed=seed)
+                                                   no_crop=not face_align, seed=seed, face_margin=face_margin)
             float_pipe.G.to(mm.unet_offload_device())
 
             return (images_bhwc,)
@@ -220,6 +223,32 @@ class FloatProcess:
             if original_cudnn_benchmark_state is not None:
                 torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
                 float_logger.debug(f"FloatProcess: Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
+
+
+class FloatImageFaceAlign:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "face_margin": ("FLOAT", {"default": 1.6, "min": 1.2, "max": 2.0, "step": 0.1}),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "process"
+    CATEGORY = "FLOAT"
+    DESCRIPTION = "Crops the area containing a face and resizes for FLOAT"
+
+    def process(self, image, face_margin):
+        np_array_image = img_tensor_2_np_array(image)
+        crop_image_np = process_img(np_array_image, BaseOptions.input_size, face_margin)
+        processed_image_float = crop_image_np.astype(np.float32) / 255.0
+        processed_image_tensor_hwc = torch.from_numpy(processed_image_float)
+        output_image_tensor_bhwc = processed_image_tensor_hwc.unsqueeze(0)
+
+        return (output_image_tensor_bhwc,)
 
 
 class FloatAdvancedParameters:

@@ -4,18 +4,20 @@
 # Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
-from .nodes import LoadFloatModels, FloatProcess, FloatAdvancedParameters
+from .nodes import LoadFloatModels, FloatProcess, FloatAdvancedParameters, FloatImageFaceAlign
 
 NODE_CLASS_MAPPINGS = {
     "LoadFloatModelsOpt": LoadFloatModels,
     "FloatProcessOpt": FloatProcess,
     "FloatAdvancedParameters": FloatAdvancedParameters,
+    "FloatImageFaceAlign": FloatImageFaceAlign,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-     "LoadFloatModelsOpt": "Load Float Models (Opt)",
-     "FloatProcessOpt": "Float Process (Opt)",
-     "FloatAdvancedParameters": "Float Advanced Options",
+     "LoadFloatModelsOpt": "Load FLOAT Models (Opt)",
+     "FloatProcessOpt": "FLOAT Process (Opt)",
+     "FloatAdvancedParameters": "FLOAT Advanced Options",
+     "FloatImageFaceAlign": "Face Align for FLOAT"
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']

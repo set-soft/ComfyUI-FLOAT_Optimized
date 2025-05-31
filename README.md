@@ -109,7 +109,7 @@ Three *models* are needed.
 
 - **ref_image**: Image to apply the voice. Use a square image. The net was trained using 512x512 images,
   so your image will be rescaled to this size. Use simple backgrounds for better results. Leave enough
-  space around the face to allow for head motion.
+  space around the face to allow for head motion or just enable **face_align**.
 - **ref_audio**: The voice to use. If this is a song try removing the music. The model can detect emotions,
   but it was trained for english. The length of the generated video is the same of the audio. Longer audios
   will need more memory.
@@ -118,7 +118,10 @@ Three *models* are needed.
   will need more memory.
 - **emotion**: Can be used to shift the emotion of the reference image.
 - **face_align**: When enabled the image will be processed to detect the face and ensure the space around
-  it is suitable for head motion.
+  it is suitable for head motion. If disabled you must ensure it.
+- **face_margin**: Controls the space around the face. The network was trained using 1.6. Making it bigger
+  you'll get more margin. Best results are achieved using 1.6, but sometimes this produces artifacts with
+  the hair, you can try to enlarge or reduce the margin a little.
 - **seed**: random seed for the generation, change it to get different videos.
 - **control after generate**: added by ComfyUI to choose what to do after a generation. Use *fixed* to
   keep the same **seed**, allowing repetitibility.
