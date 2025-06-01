@@ -21,7 +21,7 @@ from ..basemodel import BaseModel
 from .generator import Generator
 from .FMT import FlowMatchingTransformer
 
-logger = logging.getLogger("ComfyUI.FLOAT_Nodes.FLOAT")
+logger = logging.getLogger("FLOAT_Optimized.FLOAT")
 
 
 # ######## Main Phase 2 model ########
@@ -79,11 +79,9 @@ class FLOAT(BaseModel):
             'rtol': self.opt.ode_rtol,
             'method': self.opt.torchdiffeq_ode_method
         }
-        logger.debug('Simplified architecture')
-        self.print_architecture()
-        if logger.getEffectiveLevel() < logging.DEBUG:
-            logger.debug('Full architecture')
-            self.print_architecture(max_depth=-1)
+        self.print_architecture(msg='Simplified architecture')
+        if logger.getEffectiveLevel() < logging.DEBUG - 1:
+            self.print_architecture(max_depth=-1, msg='Full architecture')
 
     # ######## Motion Encoder - Decoder ########
     @torch.no_grad()

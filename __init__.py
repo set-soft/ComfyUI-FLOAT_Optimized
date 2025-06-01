@@ -8,7 +8,7 @@ from . import nodes
 import inspect
 import logging
 
-init_logger = logging.getLogger("ComfyUI.FLOAT_Nodes.__init__")
+init_logger = logging.getLogger("FLOAT_Optimized.__init__")
 
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}

@@ -4,7 +4,6 @@
 # Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
-import logging
 import numpy as np
 import os
 import torch
@@ -13,28 +12,7 @@ import comfy.model_management as mm
 
 from .generate import InferenceAgent, img_tensor_2_np_array, process_img
 from .options.base_options import BaseOptions
-
-# ######################
-# Logger setup
-# ######################
-# 1. Determine the ComfyUI global log level (influenced by --verbose)
-float_logger = logging.getLogger("ComfyUI.FLOAT_Nodes")
-comfy_root_logger = logging.getLogger('comfy')
-effective_comfy_level = logging.getLogger().getEffectiveLevel()
-# 2. Check your custom environment variable for more verbosity
-try:
-    float_nodes_debug_env = int(os.environ.get("FLOAT_NODES_DEBUG", "0"))
-except ValueError:
-    float_nodes_debug_env = 0
-# 3. Set node's logger level
-if float_nodes_debug_env:
-    float_logger.setLevel(logging.DEBUG - (float_nodes_debug_env - 1))
-    final_level_str = f"DEBUG (due to FLOAT_NODES_DEBUG={float_nodes_debug_env})"
-else:
-    float_logger.setLevel(effective_comfy_level)
-    final_level_str = logging.getLevelName(effective_comfy_level) + " (matching ComfyUI global)"
-_initial_setup_logger = logging.getLogger(__name__ + ".setup")  # A temporary logger for this message
-_initial_setup_logger.info(f"FLOAT_Nodes logger level set to: {final_level_str}")
+from .utils.logger import float_logger
 
 # List of fixed-step solvers you from torchdiffeq
 TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
@@ -187,8 +165,8 @@ class FloatProcess:
             },
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("images",)
+    RETURN_TYPES = ("IMAGE", "FLOAT")
+    RETURN_NAMES = ("images", "fps")
     FUNCTION = "floatprocess"
     CATEGORY = "FLOAT"
     DESCRIPTION = "Float Processing"
@@ -219,7 +197,7 @@ class FloatProcess:
                                                    no_crop=not face_align, seed=seed)
             float_pipe.G.to(mm.unet_offload_device())
 
-            return (images_bhwc,)
+            return (images_bhwc, fps,)
         finally:
             # Restore original cuDNN benchmark state
             if original_cudnn_benchmark_state is not None:

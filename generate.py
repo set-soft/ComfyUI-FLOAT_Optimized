@@ -23,7 +23,7 @@ from typing import Union, Dict
 from .models.float.FLOAT import FLOAT
 from .resample import comfy_audio_to_librosa_mono
 
-logger = logging.getLogger("ComfyUI.FLOAT_Nodes.generate")
+logger = logging.getLogger("FLOAT_Optimized.generate")
 fa_instance = None
 
 

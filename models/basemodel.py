@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch import Tensor
 from typing import Type, Callable, Union, List, Optional
 
-logger = logging.getLogger("ComfyUI.FLOAT_Nodes.basemodel")
+logger = logging.getLogger("FLOAT_Optimized.basemodel")
 
 
 # Helper function (if you don't have it elsewhere)
@@ -59,12 +59,14 @@ class BaseModel(torch.nn.Module):
             # The child's parameters will be summed up in its own recursive call
             self._print_recursive(child, name, depth + 1, verbose, result_list, max_depth)
 
-    def print_architecture(self, verbose=True, max_depth=2):
+    def print_architecture(self, verbose=True, max_depth=2, msg=None):
         """ Print the neural network architecture.
             Is just for debug purposes.
             It shows how much parameters has each layer """
-        if logger.getEffectiveLevel() > logging.DEBUG:
+        if logger.getEffectiveLevel() >= logging.DEBUG:
             return
+        if msg:
+            logger.debug(msg)
         class_name = type(self).__name__
         result_lines = [f'## {class_name}']
 
@@ -83,8 +85,7 @@ class BaseModel(torch.nn.Module):
             self._print_recursive(child, name, 0, verbose, result_lines, max_depth)
 
         result_lines.append(f'\nTotal number of parameters : {num2str(total_num_params)}')
-        result_lines.append('\n\n')
-        logger.info("\n".join(result_lines))
+        print("\n".join(result_lines))
 
     def set_requires_grad(self, requires_grad):
         for param in self.parameters():

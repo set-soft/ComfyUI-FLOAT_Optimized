@@ -148,7 +148,7 @@ When you face problems you can ask these nodes to show more information.
   This will show extra information for *all* the ComfyUI operations
 - If you just want extra information for these nodes you can define the `FLOAT_NODES_DEBUG` environment variable to `1`.
   This will show extra information related to FLOAT nodes.
-- If you want even more information use `2` for the environment variable.
+- If you want even more information use `2` or `3` for the environment variable.
 
 
 ## &#128279; Citation of the paper
