@@ -10,9 +10,10 @@ import torch
 import folder_paths
 import comfy.model_management as mm
 
-from .generate import InferenceAgent, img_tensor_2_np_array, process_img
 from .options.base_options import BaseOptions
+from .utils.image import img_tensor_2_np_array, process_img
 from .utils.logger import float_logger
+from .generate import InferenceAgent
 
 # List of fixed-step solvers you from torchdiffeq
 TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
@@ -23,6 +24,11 @@ TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
     "heun3",      # Heun's method (RK3)
     # "explicit_adams", # Fixed-step Adams-Bashforth (multi-step, might need more params like order)
     # "implicit_adams", # Fixed-step Adams-Moulton (multi-step, implicit)
+]
+RGBA_CONVERSION_STRATEGIES = [
+    "blend_with_color",
+    "discard_alpha",
+    "replace_with_color"
 ]
 
 
@@ -246,11 +252,16 @@ class FloatProcess:
 
 class FloatImageFaceAlign:
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": {
                 "image": ("IMAGE",),
                 "face_margin": ("FLOAT", {"default": 1.6, "min": 1.2, "max": 2.0, "step": 0.1}),
+                "rgba_conversion": (RGBA_CONVERSION_STRATEGIES, {"default": "blend_with_color"}),
+                "bkg_color_hex": ("STRING", {
+                    "default": "#000000",  # Black
+                    # Only used for "blend_with_color" and "replace_with_color"
+                }),
             },
         }
 
@@ -258,11 +269,11 @@ class FloatImageFaceAlign:
     RETURN_NAMES = ("image",)
     FUNCTION = "process"
     CATEGORY = "FLOAT"
-    DESCRIPTION = "Crops the area containing a face and resizes for FLOAT"
+    DESCRIPTION = "Crops Crops to face, resizes, and handles RGBA to RGB conversion."
     UNIQUE_NAME = "FloatImageFaceAlign"
     DISPLAY_NAME = "Face Align for FLOAT"
 
-    def process(self, image, face_margin):
+    def process(self, image, face_margin, rgba_conversion, bkg_color_hex):
         # Defensive: ensure the tensor shape is as documented
         # Should be redundant
         if image.ndim == 3:
@@ -277,7 +288,7 @@ class FloatImageFaceAlign:
         sz = BaseOptions.input_size
         ret = torch.empty((batch_size, sz, sz, 3), dtype=torch.float32, device=image.device)
         for b in range(batch_size):
-            np_array_image = img_tensor_2_np_array(image[b])
+            np_array_image = img_tensor_2_np_array(image[b], rgba_conversion, bkg_color_hex)
             crop_image_np = process_img(np_array_image, sz, face_margin)
             ret[b] = torch.from_numpy(crop_image_np.astype(np.float32) / 255.0).to(image.device)
 
@@ -355,6 +366,11 @@ class FloatAdvancedParameters:
                     "step": 0.1,
                     "display": "number"
                 }),
+                "rgba_conversion": (RGBA_CONVERSION_STRATEGIES, {"default": "blend_with_color"}),
+                "bkg_color_hex": ("STRING", {
+                    "default": "#000000",  # Black
+                    # Only used for "blend_with_color" and "replace_with_color"
+                }),
             }
         }
 
@@ -367,7 +383,7 @@ class FloatAdvancedParameters:
     DISPLAY_NAME = "FLOAT Advanced Options"
 
     def get_options(self, r_cfg_scale, attention_window, audio_dropout_prob, ref_dropout_prob, emotion_dropout_prob,
-                    ode_atol, ode_rtol, nfe, torchdiffeq_ode_method, face_margin):
+                    ode_atol, ode_rtol, nfe, torchdiffeq_ode_method, face_margin, rgba_conversion, bkg_color_hex):
 
         options_dict = {
             "r_cfg_scale": r_cfg_scale,
@@ -380,6 +396,8 @@ class FloatAdvancedParameters:
             "nfe": nfe,
             "torchdiffeq_ode_method": torchdiffeq_ode_method,
             "face_margin": face_margin,
+            "rgba_conversion": rgba_conversion,
+            "bkg_color_hex": bkg_color_hex,
         }
 
         return (options_dict,)

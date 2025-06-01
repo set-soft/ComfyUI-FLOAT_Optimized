@@ -138,6 +138,14 @@ Three *models* are needed.
 - **face_margin**: Controls the space around the face. The network was trained using 1.6. Making it bigger
   you'll get more margin. Best results are achieved using 1.6, but sometimes this produces artifacts with
   the hair, you can try to enlarge or reduce the margin a little.
+- **rgba_conversion**: How to handle images with alpha channel. Three strategies:
+    1. **blend_with_color** will blend the image with the specified color
+    2. **discard_alpha** the alpha channel is just ignored
+    3. **replace_with_color** fully transparent pixels are replaced by the specified color
+    Nodes like *Inspyrenet Rembg* generate RGBA images, part of
+    [ComfyUI-Inspyrenet-Rembg](https://github.com/john-mnz/ComfyUI-Inspyrenet-Rembg)
+- **bkg_color_hex**: Color used for the *rgba_conversion*. You can connect a *LayerUtility: ColorPicker* node
+  here, part of [ComfyUI-LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle).
 
 
 ## &#128030; Debugging

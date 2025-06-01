@@ -55,3 +55,5 @@ class BaseOptions:
     diffusion_mode: str = "sample"
     cudnn_benchmark_enabled: bool = False  # Disable cuDNN benchmarking, don't try to look for the best option, is slow
     face_margin: float = 1.6  # Face bbox multiplier during face align
+    rgba_conversion: str = "blend_with_color"  # How to handle RGBA images
+    bkg_color_hex: str = "#000000"  # Blend with black

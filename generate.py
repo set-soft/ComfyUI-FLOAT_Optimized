@@ -10,7 +10,6 @@
 
 import cv2
 from comfy.utils import ProgressBar
-import face_alignment
 import librosa
 import logging
 import os
@@ -22,9 +21,9 @@ from typing import Union, Dict
 
 from .models.float.FLOAT import FLOAT
 from .resample import comfy_audio_to_librosa_mono
+from .utils.image import img_tensor_2_np_array, process_img
 
 logger = logging.getLogger("FLOAT_Optimized.generate")
-fa_instance = None
 
 
 class CustomTransform:
@@ -38,91 +37,6 @@ class CustomTransform:
         normalized_image = (img_float / 127.5) - 1.0
         tensor_image = torch.from_numpy(normalized_image.transpose((2, 0, 1)))
         return tensor_image
-
-
-def get_face_align():
-    global fa_instance
-    if fa_instance is None:
-        fa_instance = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, flip_input=False)
-    return fa_instance
-
-
-def img_tensor_2_np_array(comfy_image_tensor: torch.Tensor) -> np.ndarray:
-    """
-    Converts a ComfyUI image tensor into an internal np.ndarray
-
-    Args:
-        comfy_image_tensor (Union[str, torch.Tensor]):
-              A ComfyUI image tensor, typically in
-              (B, H, W, C) or (H, W, C) format, float32, range [0,1], RGB.
-
-    Returns:
-        np.ndarray: The image as a NumPy array in (H, W, C) format,
-                    uint8, range [0, 255], RGB.
-    """
-    # Gemini 2.5 Pro adapted to support ComfyUI images
-    # Ensure tensor is on CPU
-    if comfy_image_tensor.device.type != 'cpu':
-        comfy_image_tensor = comfy_image_tensor.cpu()
-
-    # Handle batch dimension and select the first image
-    # ComfyUI image tensors are typically (batch, height, width, channels)
-    if comfy_image_tensor.ndim == 4:
-        if comfy_image_tensor.shape[0] != 1:
-            logger.warning(f"Warning: Input tensor has batch_size {comfy_image_tensor.shape[0]}. "
-                           "img_tensor_2_np_array is processing only the first image.")
-        img_tensor_hwc = comfy_image_tensor[0]  # Shape: (H, W, C)
-    elif comfy_image_tensor.ndim == 3:  # Assuming (H, W, C)
-        img_tensor_hwc = comfy_image_tensor
-    else:
-        raise ValueError(f"Unsupported tensor ndim: {comfy_image_tensor.ndim}. "
-                         "Expected 3 (H,W,C) or 4 (B,H,W,C).")
-
-    # Convert to NumPy array
-    # Tensor is assumed to be float32, range [0,1], and RGB channels
-    numpy_image = img_tensor_hwc.numpy()
-
-    # Scale from [0, 1] to [0, 255] and convert to uint8
-    # Using np.clip to ensure values are strictly within [0, 255] after scaling,
-    # as floating point inaccuracies might push values slightly out of [0,1].
-    numpy_image_scaled_uint8 = np.clip(numpy_image * 255.0, 0, 255).astype(np.uint8)
-
-    # The tensor is assumed to be RGB, and the target format is RGB.
-    return numpy_image_scaled_uint8
-
-
-@torch.no_grad()
-def process_img(img: np.ndarray, input_size: int, margin: float = 1.6) -> np.ndarray:
-    mult = 360. / img.shape[0]
-
-    resized_img = cv2.resize(img, dsize=(0, 0), fx=mult, fy=mult, interpolation=cv2.INTER_AREA
-                             if mult < 1. else cv2.INTER_CUBIC)
-    bboxes = get_face_align().face_detector.detect_from_image(resized_img)
-    if not bboxes:
-        msg = "Failed to detect any face in the image, no face align performed"
-        logger.warning(msg)
-
-        my = int(img.shape[0] / 2)
-        mx = int(img.shape[1] / 2)
-        bs = min(mx, my)
-    else:
-        bboxes = [(int(x1 / mult), int(y1 / mult), int(x2 / mult), int(y2 / mult), score)
-                  for (x1, y1, x2, y2, score) in bboxes if score > 0.95]
-        bboxes = bboxes[0]  # Just use first bbox
-
-        bsy = int((bboxes[3] - bboxes[1]) / 2)
-        bsx = int((bboxes[2] - bboxes[0]) / 2)
-        my = int((bboxes[1] + bboxes[3]) / 2)
-        mx = int((bboxes[0] + bboxes[2]) / 2)
-
-        bs = int(max(bsy, bsx) * margin)
-        img = cv2.copyMakeBorder(img, bs, bs, bs, bs, cv2.BORDER_CONSTANT, value=0)
-        my, mx = my + bs, mx + bs      # BBox center y, bbox center x
-
-    crop_img = img[my - bs:my + bs, mx - bs:mx + bs]
-    crop_img = cv2.resize(crop_img, dsize=(input_size, input_size), interpolation=cv2.INTER_AREA
-                          if mult < 1. else cv2.INTER_CUBIC)
-    return crop_img
 
 
 class DataProcessor:
@@ -162,8 +76,8 @@ class DataProcessor:
             speech_array, sampling_rate = librosa.load(path, sr=self.sampling_rate)
         return self.wav2vec_preprocessor(speech_array, sampling_rate=sampling_rate, return_tensors='pt').input_values[0]
 
-    def preprocess(self, ref_path: Union[str, torch.Tensor], audio_path: Union[str, Dict], no_crop: bool) -> dict:
-        s = img_tensor_2_np_array(ref_path)
+    def preprocess(self, ref_img: torch.Tensor, audio_path: Dict, no_crop: bool) -> dict:
+        s = img_tensor_2_np_array(ref_img, self.opt.rgba_conversion, self.opt.bkg_color_hex)
         if not no_crop:
             s = process_img(s, self.input_size, self.opt.face_margin)
         s = self.transform(s).unsqueeze(0)
@@ -245,8 +159,8 @@ class InferenceAgent:
     def run_inference(
         self,
         res_video_path: str,
-        ref_path: Union[str, torch.Tensor],
-        audio_path: Union[str, Dict],
+        ref_img: torch.Tensor,
+        audio_path: Dict,
         a_cfg_scale: float = 2.0,
         r_cfg_scale: float = 1.0,
         e_cfg_scale: float = 1.0,
@@ -255,7 +169,7 @@ class InferenceAgent:
         no_crop: bool = False,
         seed: int = 25
     ) -> str:
-        data = self.data_processor.preprocess(ref_path, audio_path, no_crop=no_crop)
+        data = self.data_processor.preprocess(ref_img, audio_path, no_crop=no_crop)
 
         # inference
         d_hat = self.G.inference(data=data, a_cfg_scale=a_cfg_scale, r_cfg_scale=r_cfg_scale, e_cfg_scale=e_cfg_scale,
