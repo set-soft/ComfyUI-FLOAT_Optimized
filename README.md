@@ -119,12 +119,26 @@ Three *models* are needed.
 - **emotion**: Can be used to shift the emotion of the reference image.
 - **face_align**: When enabled the image will be processed to detect the face and ensure the space around
   it is suitable for head motion. If disabled you must ensure it.
-- **face_margin**: Controls the space around the face. The network was trained using 1.6. Making it bigger
-  you'll get more margin. Best results are achieved using 1.6, but sometimes this produces artifacts with
-  the hair, you can try to enlarge or reduce the margin a little.
 - **seed**: random seed for the generation, change it to get different videos.
 - **control after generate**: added by ComfyUI to choose what to do after a generation. Use *fixed* to
   keep the same **seed**, allowing repetitibility.
+
+### Float Advanced Options
+
+- **r_cfg_scale**: Reference classifier-free guidance (vector field) scale.
+  Will just enable CFG process if different than 1.
+- **attention_window**: Attention window size, e.g., if 1, attend frames of t-1, t, t+1 for frame t
+- **audio_dropout_prob**: Dropout probability for audio
+- **ref_dropout_prob**: Dropout probability for reference
+- **emotion_dropout_prob**: Dropout probability for emotion
+- **ode_atol**: Absolute tolerance for the Ordinary Differential Equation solver (ODE)
+- **ode_rtol**: Relative tolerance for the ODE
+- **nfe**: Number of Function Evaluations for the ODE
+- **torchdiffeq_ode_method**: ODE method
+- **face_margin**: Controls the space around the face. The network was trained using 1.6. Making it bigger
+  you'll get more margin. Best results are achieved using 1.6, but sometimes this produces artifacts with
+  the hair, you can try to enlarge or reduce the margin a little.
+
 
 ## &#128030; Debugging
 

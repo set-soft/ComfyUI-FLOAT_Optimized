@@ -53,4 +53,5 @@ class BaseOptions:
     n_diff_steps: int = 500
     diff_schedule: str = "cosine"
     diffusion_mode: str = "sample"
-    cudnn_benchmark_enabled = False  # Disable cuDNN benchmarking, don't try to look for the best option, is slow
+    cudnn_benchmark_enabled: bool = False  # Disable cuDNN benchmarking, don't try to look for the best option, is slow
+    face_margin: float = 1.6  # Face bbox multiplier during face align

@@ -181,7 +181,6 @@ class FloatProcess:
                 "fps": ("FLOAT", {"default": 25, "step": 1}),
                 "emotion": (['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise'], {"default": "none"}),
                 "face_align": ("BOOLEAN", {"default": True}, ),
-                "face_margin": ("FLOAT", {"default": 1.6, "min": 1.2, "max": 2.0, "step": 0.1}),
                 "seed": ("INT", {"default": 62064758300528, "min": 0, "max": 0xffffffffffffffff}),
             },
         }
@@ -192,8 +191,7 @@ class FloatProcess:
     CATEGORY = "FLOAT"
     DESCRIPTION = "Float Processing"
 
-    def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, e_cfg_scale, fps, emotion, face_align, face_margin,
-                     seed):
+    def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, e_cfg_scale, fps, emotion, face_align, seed):
 
         original_cudnn_benchmark_state = None
         is_cuda_device = float_pipe.opt.rank.type == 'cuda'
@@ -214,7 +212,7 @@ class FloatProcess:
             images_bhwc = float_pipe.run_inference(None, ref_image, ref_audio, a_cfg_scale=a_cfg_scale,
                                                    r_cfg_scale=float_pipe.opt.r_cfg_scale, e_cfg_scale=e_cfg_scale,
                                                    emo=None if emotion == "none" else emotion,
-                                                   no_crop=not face_align, seed=seed, face_margin=face_margin)
+                                                   no_crop=not face_align, seed=seed)
             float_pipe.G.to(mm.unet_offload_device())
 
             return (images_bhwc,)
@@ -312,6 +310,13 @@ class FloatAdvancedParameters:
                 "torchdiffeq_ode_method": (TORCHDIFFEQ_FIXED_STEP_SOLVERS, {
                     "default": "euler"
                 }),
+                "face_margin": ("FLOAT", {
+                    "default": 1.6,
+                    "min": 1.2,
+                    "max": 2.0,
+                    "step": 0.1,
+                    "display": "number"
+                }),
             }
         }
 
@@ -322,7 +327,7 @@ class FloatAdvancedParameters:
     DESCRIPTION = "Float Advanced Options"
 
     def get_options(self, r_cfg_scale, attention_window, audio_dropout_prob, ref_dropout_prob, emotion_dropout_prob,
-                    ode_atol, ode_rtol, nfe, torchdiffeq_ode_method):
+                    ode_atol, ode_rtol, nfe, torchdiffeq_ode_method, face_margin):
 
         options_dict = {
             "r_cfg_scale": r_cfg_scale,
@@ -333,7 +338,8 @@ class FloatAdvancedParameters:
             "ode_atol": ode_atol,
             "ode_rtol": ode_rtol,
             "nfe": nfe,
-            "torchdiffeq_ode_method": torchdiffeq_ode_method
+            "torchdiffeq_ode_method": torchdiffeq_ode_method,
+            "face_margin": face_margin,
         }
 
         return (options_dict,)

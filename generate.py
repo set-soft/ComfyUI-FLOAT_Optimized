@@ -162,11 +162,10 @@ class DataProcessor:
             speech_array, sampling_rate = librosa.load(path, sr=self.sampling_rate)
         return self.wav2vec_preprocessor(speech_array, sampling_rate=sampling_rate, return_tensors='pt').input_values[0]
 
-    def preprocess(self, ref_path: Union[str, torch.Tensor], audio_path: Union[str, Dict], no_crop: bool,
-                   face_margin: float) -> dict:
+    def preprocess(self, ref_path: Union[str, torch.Tensor], audio_path: Union[str, Dict], no_crop: bool) -> dict:
         s = img_tensor_2_np_array(ref_path)
         if not no_crop:
-            s = process_img(s, self.input_size, face_margin)
+            s = process_img(s, self.input_size, self.opt.face_margin)
         s = self.transform(s).unsqueeze(0)
         a = self.default_aud_loader(audio_path).unsqueeze(0)
         return {'s': s, 'a': a, 'p': None, 'e': None}
@@ -254,10 +253,9 @@ class InferenceAgent:
         emo: str = 'S2E',
         nfe: int = 10,
         no_crop: bool = False,
-        seed: int = 25,
-        face_margin: float = 1.6,
+        seed: int = 25
     ) -> str:
-        data = self.data_processor.preprocess(ref_path, audio_path, no_crop=no_crop, face_margin=face_margin)
+        data = self.data_processor.preprocess(ref_path, audio_path, no_crop=no_crop)
 
         # inference
         d_hat = self.G.inference(data=data, a_cfg_scale=a_cfg_scale, r_cfg_scale=r_cfg_scale, e_cfg_scale=e_cfg_scale,
