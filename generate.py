@@ -44,11 +44,6 @@ def get_face_align():
     global fa_instance
     if fa_instance is None:
         fa_instance = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, flip_input=False)
-    print(f"fa_instance: {fa_instance}")
-    try:
-        print(f"fa_instance.device: {fa_instance.device}")
-    except Exception as e:
-        print(f"fa_instance.device: {e}")
     return fa_instance
 
 

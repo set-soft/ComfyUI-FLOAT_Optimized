@@ -244,11 +244,8 @@ class FloatImageFaceAlign:
     def process(self, image, face_margin):
         np_array_image = img_tensor_2_np_array(image)
         crop_image_np = process_img(np_array_image, BaseOptions.input_size, face_margin)
-        processed_image_float = crop_image_np.astype(np.float32) / 255.0
-        processed_image_tensor_hwc = torch.from_numpy(processed_image_float)
-        output_image_tensor_bhwc = processed_image_tensor_hwc.unsqueeze(0)
 
-        return (output_image_tensor_bhwc,)
+        return (torch.from_numpy(crop_image_np.astype(np.float32) / 255.0).unsqueeze(0),)
 
 
 class FloatAdvancedParameters:
