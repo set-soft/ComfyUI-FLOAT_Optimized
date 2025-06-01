@@ -95,7 +95,7 @@ Three *models* are needed.
 
 ## &#128218; Nodes
 
-### Load Float Models (Opt)
+### Load FLOAT Models (Opt)
 
 - **model**: Shows the models in `models/float`. Currently you can choose between `FLOAT.safetensors` (unified) and `float.pth`
   The default is `FLOAT.safetensors`, if the file isn't there it will be downloaded.
@@ -105,7 +105,7 @@ Three *models* are needed.
   For this reason the default value is disabled. This is much better for RTX3060 systems.
   If you find enabling it is better for your system please report it.
 
-### Float Process (Opt)
+### FLOAT Process (Opt)
 
 - **ref_image**: Image to apply the voice. Use a square image. The net was trained using 512x512 images,
   so your image will be rescaled to this size. Use simple backgrounds for better results. Leave enough
@@ -123,7 +123,7 @@ Three *models* are needed.
 - **control after generate**: added by ComfyUI to choose what to do after a generation. Use *fixed* to
   keep the same **seed**, allowing repetitibility.
 
-### Float Advanced Options
+### FLOAT Advanced Options
 
 - **r_cfg_scale**: Reference classifier-free guidance (vector field) scale.
   Will just enable CFG process if different than 1.
