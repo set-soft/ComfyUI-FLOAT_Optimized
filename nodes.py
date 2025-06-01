@@ -165,8 +165,8 @@ class FloatProcess:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "FLOAT")
-    RETURN_NAMES = ("images", "fps")
+    RETURN_TYPES = ("IMAGE", "AUDIO", "FLOAT")
+    RETURN_NAMES = ("images", "ref_audio", "fps")
     FUNCTION = "floatprocess"
     CATEGORY = "FLOAT"
     DESCRIPTION = "Float Processing"
@@ -189,20 +189,59 @@ class FloatProcess:
                 float_logger.debug("FloatProcess: Not a CUDA device or cuDNN not available, benchmark setting skipped.")
 
             float_pipe.G.to(float_pipe.rank)
-
             float_pipe.opt.fps = fps
-            images_bhwc = float_pipe.run_inference(None, ref_image, ref_audio, a_cfg_scale=a_cfg_scale,
-                                                   r_cfg_scale=float_pipe.opt.r_cfg_scale, e_cfg_scale=e_cfg_scale,
-                                                   emo=None if emotion == "none" else emotion,
-                                                   no_crop=not face_align, seed=seed)
-            float_pipe.G.to(mm.unet_offload_device())
 
-            return (images_bhwc, fps,)
+            # Determine batch sizes
+            image_batch_size = ref_image.shape[0]
+            audio_waveform = ref_audio['waveform']
+            audio_sample_rate = ref_audio['sample_rate']
+            audio_batch_size = audio_waveform.shape[0]
+            target_batch_size = max(image_batch_size, audio_batch_size)
+            all_generated_images = []
+            used_audio_waveforms = []
+
+            # Loop for all image/audio pairs
+            for i in range(target_batch_size):
+                float_logger.debug(f"Processing batch item {i+1}/{target_batch_size}")
+
+                # Select current image slice (B=1, H, W, C)
+                current_image_idx = min(i, image_batch_size - 1)
+                current_ref_image_slice = ref_image[current_image_idx:current_image_idx+1]
+                current_ref_image_slice = current_ref_image_slice.to(float_pipe.rank)
+
+                # Select current audio slice {'waveform': (1, C_aud, N_aud), 'sample_rate': int}
+                current_audio_idx = min(i, audio_batch_size - 1)
+                current_ref_audio_slice_waveform = audio_waveform[current_audio_idx:current_audio_idx+1]
+                current_ref_audio_slice_waveform = current_ref_audio_slice_waveform.to(float_pipe.rank)
+                current_ref_audio_dict = {'waveform': current_ref_audio_slice_waveform, 'sample_rate': audio_sample_rate}
+
+                float_logger.debug(current_ref_image_slice.shape)
+                float_logger.debug(current_ref_audio_slice_waveform.shape)
+
+                images_thwc = float_pipe.run_inference(None, current_ref_image_slice, current_ref_audio_dict,
+                                                       a_cfg_scale=a_cfg_scale, r_cfg_scale=float_pipe.opt.r_cfg_scale,
+                                                       e_cfg_scale=e_cfg_scale, emo=None if emotion == "none" else emotion,
+                                                       no_crop=not face_align, seed=seed + i)
+                all_generated_images.append(images_thwc.cpu())
+                used_audio_waveforms.append(current_ref_audio_slice_waveform.cpu())
+
+            if target_batch_size == 1:
+                output_audio_dict = ref_audio
+            else:
+                squeezed_audio_segments = [wf.squeeze(0) for wf in used_audio_waveforms]  # List of (C, N_seg)
+                concatenated_channels_first = torch.cat(squeezed_audio_segments, dim=1)   # (C, Total_N)
+                final_concatenated_audio_wf = concatenated_channels_first.unsqueeze(0)    # (1, C, Total_N)
+                final_concatenated_audio_wf = final_concatenated_audio_wf.to(audio_waveform.device)  # Move to original device
+                output_audio_dict = {'waveform': final_concatenated_audio_wf, 'sample_rate': audio_sample_rate}
+
+            return (torch.cat(all_generated_images, dim=0), output_audio_dict, fps,)
         finally:
             # Restore original cuDNN benchmark state
             if original_cudnn_benchmark_state is not None:
                 torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
                 float_logger.debug(f"FloatProcess: Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
+
+            float_pipe.G.to(mm.unet_offload_device())
 
 
 class FloatImageFaceAlign:
@@ -224,10 +263,25 @@ class FloatImageFaceAlign:
     DISPLAY_NAME = "Face Align for FLOAT"
 
     def process(self, image, face_margin):
-        np_array_image = img_tensor_2_np_array(image)
-        crop_image_np = process_img(np_array_image, BaseOptions.input_size, face_margin)
+        # Defensive: ensure the tensor shape is as documented
+        # Should be redundant
+        if image.ndim == 3:
+            float_logger.warning("Missing batch size")
+            image = image.unsqueeze(0)
+        if image.ndim != 4:
+            msg = f"Image shape is incorrect {image.shape}"
+            float_logger.error(msg)
+            raise ValueError(msg)
 
-        return (torch.from_numpy(crop_image_np.astype(np.float32) / 255.0).unsqueeze(0),)
+        batch_size = image.shape[0]
+        sz = BaseOptions.input_size
+        ret = torch.empty((batch_size, sz, sz, 3), dtype=torch.float32, device=image.device)
+        for b in range(batch_size):
+            np_array_image = img_tensor_2_np_array(image[b])
+            crop_image_np = process_img(np_array_image, sz, face_margin)
+            ret[b] = torch.from_numpy(crop_image_np.astype(np.float32) / 255.0).to(image.device)
+
+        return (ret,)
 
 
 class FloatAdvancedParameters:
