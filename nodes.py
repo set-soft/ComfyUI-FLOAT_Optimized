@@ -90,6 +90,8 @@ class LoadFloatModels:
     FUNCTION = "loadmodel"
     CATEGORY = "FLOAT"
     DESCRIPTION = "Models are auto-downloaded to /ComfyUI/models/float"
+    UNIQUE_NAME = "LoadFloatModelsOpt"
+    DISPLAY_NAME = "Load FLOAT Models (Opt)"
 
     def loadmodel(self, model, target_device, cudnn_benchmark, advanced_float_options=None):
         # Get the root path of this custom node package to locate bundled configs
@@ -190,6 +192,8 @@ class FloatProcess:
     FUNCTION = "floatprocess"
     CATEGORY = "FLOAT"
     DESCRIPTION = "Float Processing"
+    UNIQUE_NAME = "FloatProcessOpt"
+    DISPLAY_NAME = "FLOAT Process (Opt)"
 
     def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, e_cfg_scale, fps, emotion, face_align, seed):
 
@@ -238,6 +242,8 @@ class FloatImageFaceAlign:
     FUNCTION = "process"
     CATEGORY = "FLOAT"
     DESCRIPTION = "Crops the area containing a face and resizes for FLOAT"
+    UNIQUE_NAME = "FloatImageFaceAlign"
+    DISPLAY_NAME = "Face Align for FLOAT"
 
     def process(self, image, face_margin):
         np_array_image = img_tensor_2_np_array(image)
@@ -324,7 +330,9 @@ class FloatAdvancedParameters:
     RETURN_NAMES = ("advanced_options",)
     FUNCTION = "get_options"
     CATEGORY = "FLOAT"
-    DESCRIPTION = "Float Advanced Options"
+    DESCRIPTION = "FLOAT Advanced Options"
+    UNIQUE_NAME = "FloatAdvancedParameters"
+    DISPLAY_NAME = "FLOAT Advanced Options"
 
     def get_options(self, r_cfg_scale, attention_window, audio_dropout_prob, ref_dropout_prob, emotion_dropout_prob,
                     ode_atol, ode_rtol, nfe, torchdiffeq_ode_method, face_margin):

@@ -4,20 +4,23 @@
 # Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
-from .nodes import LoadFloatModels, FloatProcess, FloatAdvancedParameters, FloatImageFaceAlign
+from . import nodes
+import inspect
+import logging
 
-NODE_CLASS_MAPPINGS = {
-    "LoadFloatModelsOpt": LoadFloatModels,
-    "FloatProcessOpt": FloatProcess,
-    "FloatAdvancedParameters": FloatAdvancedParameters,
-    "FloatImageFaceAlign": FloatImageFaceAlign,
-}
+init_logger = logging.getLogger("ComfyUI.FLOAT_Nodes.__init__")
 
-NODE_DISPLAY_NAME_MAPPINGS = {
-     "LoadFloatModelsOpt": "Load FLOAT Models (Opt)",
-     "FloatProcessOpt": "FLOAT Process (Opt)",
-     "FloatAdvancedParameters": "FLOAT Advanced Options",
-     "FloatImageFaceAlign": "Face Align for FLOAT"
-}
+NODE_CLASS_MAPPINGS = {}
+NODE_DISPLAY_NAME_MAPPINGS = {}
+
+for name, obj in inspect.getmembers(nodes):
+    if not inspect.isclass(obj) or not hasattr(obj, "INPUT_TYPES"):
+        continue
+    assert hasattr(obj, "UNIQUE_NAME"), f"No name for {obj.__name__}"
+    NODE_CLASS_MAPPINGS[obj.UNIQUE_NAME] = obj
+    NODE_DISPLAY_NAME_MAPPINGS[obj.UNIQUE_NAME] = obj.DISPLAY_NAME
+
+init_logger.info(f"FLOAT_Optimized: Registering {len(NODE_CLASS_MAPPINGS)} node(s).")
+init_logger.debug(f"FLOAT_Optimized: {list(NODE_DISPLAY_NAME_MAPPINGS.values())}")
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
