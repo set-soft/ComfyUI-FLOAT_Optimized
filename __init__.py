@@ -21,7 +21,7 @@ for name, obj in inspect.getmembers(nodes) + inspect.getmembers(nodes_audio):
     NODE_CLASS_MAPPINGS[obj.UNIQUE_NAME] = obj
     NODE_DISPLAY_NAME_MAPPINGS[obj.UNIQUE_NAME] = obj.DISPLAY_NAME
 
-init_logger.info(f"FLOAT_Optimized: Registering {len(NODE_CLASS_MAPPINGS)} node(s).")
-init_logger.debug(f"FLOAT_Optimized: {list(NODE_DISPLAY_NAME_MAPPINGS.values())}")
+init_logger.info(f"Registering {len(NODE_CLASS_MAPPINGS)} node(s).")
+init_logger.debug(f"{list(NODE_DISPLAY_NAME_MAPPINGS.values())}")
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
