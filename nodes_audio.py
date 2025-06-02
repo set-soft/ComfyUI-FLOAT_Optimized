@@ -8,6 +8,9 @@ import torchaudio.transforms as T
 import logging
 
 logger = logging.getLogger("FLOAT_Optimized.audio")
+BASE_CATEGORY = "audio"
+BATCH_CATEGORY = "batch"
+CONV_CATEGORY = "conversion"
 
 
 def convert_batch_to_stereo_tensor(audio_waveform_mono_batch: torch.Tensor) -> torch.Tensor:
@@ -32,9 +35,9 @@ class AudioBatch:
     RETURN_TYPES = ("AUDIO",)
     RETURN_NAMES = ("audio_batch",)
     FUNCTION = "batch_audio"
-    CATEGORY = "audio"
+    CATEGORY = BASE_CATEGORY + "/" + BATCH_CATEGORY
     DESCRIPTION = "Audio batch creator"
-    UNIQUE_NAME = "AudioBatchFloat"
+    UNIQUE_NAME = "SET_AudioBatch"
     DISPLAY_NAME = "Batch Audios"
 
     def _preprocess_waveform_batch(
@@ -228,9 +231,9 @@ class SelectAudioFromBatch:
     RETURN_TYPES = ("AUDIO",)
     RETURN_NAMES = ("selected_audio",)
     FUNCTION = "select_audio"
-    CATEGORY = "audio"
+    CATEGORY = BASE_CATEGORY + "/" + BATCH_CATEGORY
     DESCRIPTION = "Selects an audio from a batch"
-    UNIQUE_NAME = "SelectAudioFromBatchFloat"
+    UNIQUE_NAME = "SET_SelectAudioFromBatch"
     DISPLAY_NAME = "Select Audio from Batch"
 
     def select_audio(self, audio_batch: dict, index: int, behavior_out_of_range: str, silence_duration_seconds: float):
