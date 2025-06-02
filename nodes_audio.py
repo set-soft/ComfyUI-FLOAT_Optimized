@@ -286,3 +286,164 @@ class SelectAudioFromBatch:
         }
 
         return (output_audio,)
+
+
+class AudioChannelConverter:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "audio": ("AUDIO",),
+                "channel_conversion": (["keep", "stereo_to_mono", "mono_to_stereo", "force_mono", "force_stereo"],
+                                       {"default": "keep"}),
+            },
+        }
+
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = ("audio_out",)
+    FUNCTION = "convert_channels"
+    CATEGORY = BASE_CATEGORY + "/" + CONV_CATEGORY
+    DESCRIPTION = "Converts audio channels (mono/stereo/multi-channel handling)."
+    UNIQUE_NAME = "SET_AudioChannelConverter"
+    DISPLAY_NAME = "Audio Channel Converter"
+
+    def convert_channels(self, audio: dict, channel_conversion: str):
+        waveform = audio['waveform']  # (B, C, T)
+        sample_rate = audio['sample_rate']
+
+        original_batch_size, original_channels, original_samples = waveform.shape
+        logger.debug(f"Input audio: {original_batch_size}B, {original_channels}C, {original_samples}T @ {sample_rate}Hz")
+        logger.debug(f"Channel conversion mode: {channel_conversion}")
+
+        output_waveform = waveform.clone()  # Start with a copy
+
+        if channel_conversion == "keep":
+            # No change needed, but log if > 2 channels
+            if original_channels > 2:
+                logger.warning(f"Channel mode 'keep': Input has {original_channels} channels. Outputting all "
+                               f"{original_channels} channels.")
+            # output_waveform remains as is
+
+        elif channel_conversion == "stereo_to_mono" or channel_conversion == "force_mono":
+            if original_channels == 1:
+                logger.debug("Input is already mono. No change for stereo_to_mono/force_mono.")
+                # output_waveform remains as is
+            else:  # Stereo or Multi-channel to Mono
+                if original_channels > 2 and channel_conversion == "stereo_to_mono":
+                    logger.warning(f"Channel mode 'stereo_to_mono': Input has {original_channels} channels. "
+                                   "Averaging all to mono.")
+                elif channel_conversion == "force_mono":
+                    logger.info(f"Channel mode 'force_mono': Input has {original_channels} channels. Averaging all to mono.")
+                # Average across the channel dimension (dim=1)
+                output_waveform = torch.mean(waveform, dim=1, keepdim=True)
+                logger.debug(f"Converted to mono. New shape: {output_waveform.shape}")
+
+        elif channel_conversion == "mono_to_stereo" or channel_conversion == "force_stereo":
+            if original_channels == 2:
+                logger.debug("Input is already stereo. No change for mono_to_stereo/force_stereo.")
+                # output_waveform remains as is
+            elif original_channels == 1:  # Mono to Stereo
+                # Duplicate the mono channel
+                output_waveform = waveform.repeat(1, 2, 1)
+                logger.debug(f"Converted mono to stereo by duplication. New shape: {output_waveform.shape}")
+            else:  # Multi-channel (>2) to Stereo
+                if channel_conversion == "mono_to_stereo":
+                    logger.warning(f"Channel mode 'mono_to_stereo': Input has {original_channels} channels. "
+                                   "Taking the first channel and duplicating it to create stereo.")
+                elif channel_conversion == "force_stereo":
+                    logger.info(f"Channel mode 'force_stereo': Input has {original_channels} channels. "
+                                "Taking the first channel and duplicating it to create stereo.")
+                output_waveform = waveform[:, 0:1, :].repeat(1, 2, 1)  # Take first channel, make it (B,1,T), then repeat
+                logger.debug(f"Converted {original_channels}ch to stereo. New shape: {output_waveform.shape}")
+        else:
+            logger.error(f"Unknown channel_conversion mode: {channel_conversion}. Returning original.")
+            # output_waveform remains as is (original waveform)
+
+        processed_audio_dict = {"waveform": output_waveform, "sample_rate": sample_rate}
+        return (processed_audio_dict,)
+
+
+class AudioResampler:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "audio": ("AUDIO",),
+                "target_sample_rate": ("INT", {"default": 0, "min": 0, "max": 192000, "step": 100}),
+            },
+        }
+
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = ("audio_out",)
+    FUNCTION = "resample_audio"
+    CATEGORY = BASE_CATEGORY + "/" + CONV_CATEGORY
+    DESCRIPTION = "Resamples audio to a target sample rate using torchaudio."
+    UNIQUE_NAME = "SET_AudioResampler"
+    DISPLAY_NAME = "Audio Resampler"
+
+    def resample_audio(self, audio: dict, target_sample_rate: int):
+        waveform = audio['waveform']  # (B, C, T)
+        original_sample_rate = audio['sample_rate']
+
+        logger.debug(f"Input audio SR: {original_sample_rate}Hz, Target SR: {target_sample_rate}Hz")
+
+        if target_sample_rate == 0 or target_sample_rate == original_sample_rate:
+            logger.info(f"Target sample rate ({target_sample_rate}Hz) is 0 or matches original ({original_sample_rate}Hz). "
+                        "Skipping resampling.")
+            return (audio,)  # Return original audio dict
+
+        try:
+            # Ensure waveform is on the CPU for torchaudio transforms if it might be on GPU
+            # Though many torchaudio ops support GPU tensors. Resample does.
+            # For consistency or if issues arise:
+            # device = waveform.device
+            # waveform_cpu = waveform.cpu()
+            # resampler = T.Resample(orig_freq=original_sample_rate, new_freq=target_sample_rate).to(device)
+            # resampled_waveform = resampler(waveform)
+            resampler = T.Resample(orig_freq=original_sample_rate, new_freq=target_sample_rate,
+                                   dtype=waveform.dtype  # Preserve dtype
+                                   ).to(waveform.device)  # Perform resampling on the tensor's current device
+
+            resampled_waveform = resampler(waveform)
+            logger.info(f"Resampled audio from {original_sample_rate}Hz to {target_sample_rate}Hz. "
+                        f"Original shape: {waveform.shape}, New shape: {resampled_waveform.shape}")
+            processed_audio_dict = {"waveform": resampled_waveform, "sample_rate": target_sample_rate}
+            return (processed_audio_dict,)
+
+        except Exception as e:
+            logger.error(f"Error during resampling: {e}", exc_info=True)
+            # Fallback: return original audio if resampling fails
+            return (audio,)
+
+
+class AudioProcessAdvanced:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "audio": ("AUDIO",),
+                "channel_conversion": (["keep", "stereo_to_mono", "mono_to_stereo", "force_mono", "force_stereo"],
+                                       {"default": "keep"}),
+                "target_sample_rate": ("INT", {"default": 0, "min": 0, "max": 192000, "step": 100}),
+            },
+        }
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = ("audio_out",)
+    FUNCTION = "process_audio"
+    CATEGORY = BASE_CATEGORY + "/" + CONV_CATEGORY
+    DESCRIPTION = "Applies channel conversion and resampling to audio."
+    UNIQUE_NAME = "SET_AudioChannelConvResampler"
+    DISPLAY_NAME = "Audio Channel Conv and Resampler"
+
+    def process_audio(self, audio: dict, channel_conversion: str, target_sample_rate: int):
+        # Instantiate helper classes (or move their logic directly here)
+        channel_converter_node = AudioChannelConverter()
+        resampler_node = AudioResampler()
+
+        # 1. Channel Conversion
+        (audio_after_channels,) = channel_converter_node.convert_channels(audio, channel_conversion)
+
+        # 2. Resampling
+        (audio_after_resample,) = resampler_node.resample_audio(audio_after_channels, target_sample_rate)
+
+        return (audio_after_resample,)
