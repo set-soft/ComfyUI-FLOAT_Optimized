@@ -7,8 +7,9 @@
 from . import nodes
 import inspect
 import logging
+from .utils.misc import NODES_NAME
 
-init_logger = logging.getLogger("FLOAT_Optimized.__init__")
+init_logger = logging.getLogger(f"{NODES_NAME}.__init__")
 
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}

@@ -10,8 +10,9 @@ import librosa
 import logging
 import numpy as np
 import torch
+from .utils.misc import NODES_NAME
 
-logger = logging.getLogger("ComfyUI.FLOAT_Nodes.resample")
+logger = logging.getLogger(f"{NODES_NAME}.resample")
 
 
 def resample_audio_numpy(audio_data_numpy: np.ndarray, original_sr: int, target_sr: int,

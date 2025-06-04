@@ -20,8 +20,9 @@ from ..wav2vec2_ser import Wav2Vec2ForSpeechClassification
 from ..basemodel import BaseModel
 from .generator import Generator
 from .FMT import FlowMatchingTransformer
+from ...utils.misc import NODES_NAME
 
-logger = logging.getLogger("FLOAT_Optimized.FLOAT")
+logger = logging.getLogger(f"{NODES_NAME}.FLOAT")
 
 
 # ######## Main Phase 2 model ########

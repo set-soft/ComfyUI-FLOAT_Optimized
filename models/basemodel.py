@@ -8,8 +8,9 @@ import torch.nn as nn
 
 from torch import Tensor
 from typing import Type, Callable, Union, List, Optional
+from ..utils.misc import NODES_NAME
 
-logger = logging.getLogger("FLOAT_Optimized.basemodel")
+logger = logging.getLogger(f"{NODES_NAME}.basemodel")
 
 
 # Helper function (if you don't have it elsewhere)

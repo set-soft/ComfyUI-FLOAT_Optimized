@@ -22,8 +22,9 @@ from typing import Union, Dict
 from .models.float.FLOAT import FLOAT
 from .resample import comfy_audio_to_librosa_mono
 from .utils.image import img_tensor_2_np_array, process_img
+from .utils.misc import NODES_NAME
 
-logger = logging.getLogger("FLOAT_Optimized.generate")
+logger = logging.getLogger(f"{NODES_NAME}.generate")
 
 
 class CustomTransform:

@@ -12,7 +12,7 @@ import comfy.model_management as mm
 
 from .options.base_options import BaseOptions
 from .utils.image import img_tensor_2_np_array, process_img
-from .utils.logger import float_logger
+from .utils.logger import main_logger
 from .generate import InferenceAgent
 
 # List of fixed-step solvers you from torchdiffeq
@@ -80,11 +80,11 @@ class LoadFloatModels:
     def loadmodel(self, model, target_device, cudnn_benchmark, advanced_float_options=None):
         # Get the root path of this custom node package to locate bundled configs
         node_root_path = os.path.dirname(os.path.abspath(__file__))
-        float_logger.debug(f"Node root path for bundled configs: {node_root_path}")
+        main_logger.debug(f"Node root path for bundled configs: {node_root_path}")
 
         # Path to the selected combined model file
         ckpt_full_path = os.path.join(folder_paths.models_dir, "float", model)
-        float_logger.info(f"Selected combined model file: {ckpt_full_path}")
+        main_logger.info(f"Selected combined model file: {ckpt_full_path}")
         float_models_dir = os.path.join(folder_paths.models_dir, "float")
 
         if model.lower().endswith(".pth"):
@@ -102,13 +102,13 @@ class LoadFloatModels:
                 alt_dir = os.path.join(audio_models_dir, "wav2vec2-base-960h")
                 if os.path.isdir(alt_dir):
                     wav2vec2_base_960h_models_dir = alt_dir
-                    float_logger.debug("Using speech encoder from: "+alt_dir)
+                    main_logger.debug("Using speech encoder from: "+alt_dir)
             # Allow models/audio/wav2vec-english-speech-emotion-recognition
             if not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir):
                 alt_dir = os.path.join(audio_models_dir, "wav2vec-english-speech-emotion-recognition")
                 if os.path.isdir(alt_dir):
                     wav2vec_english_speech_emotion_recognition_models_dir = alt_dir
-                    float_logger.debug("Using emotion decoder from: "+alt_dir)
+                    main_logger.debug("Using emotion decoder from: "+alt_dir)
 
             if (not os.path.exists(ckpt_full_path) or not os.path.isdir(wav2vec2_base_960h_models_dir) or
                not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir)):
@@ -121,7 +121,7 @@ class LoadFloatModels:
             # Unified model (safetensors)
             # ##############################
             if not os.path.exists(ckpt_full_path):
-                float_logger.warning(f"Model file {ckpt_full_path} not found. Trying to download it ...")
+                main_logger.warning(f"Model file {ckpt_full_path} not found. Trying to download it ...")
                 from huggingface_hub import snapshot_download
                 snapshot_download(repo_id="set-soft/float", local_dir=float_models_dir)
             unified = True
@@ -135,21 +135,21 @@ class LoadFloatModels:
                     setattr(opt, key, value)
 
         opt.rank = torch.device(target_device)
-        float_logger.debug(f"Instantiating InferenceAgent for device {opt.rank}")
+        main_logger.debug(f"Instantiating InferenceAgent for device {opt.rank}")
         opt.cudnn_benchmark = cudnn_benchmark
         opt.ckpt_path = ckpt_full_path
         if not unified:
             opt.pretrained_dir = float_models_dir
             opt.wav2vec_model_path = wav2vec2_base_960h_models_dir
             opt.audio2emotion_path = wav2vec_english_speech_emotion_recognition_models_dir
-            float_logger.debug(f"- Using {ckpt_full_path}, {wav2vec2_base_960h_models_dir} and "
-                               f"{wav2vec_english_speech_emotion_recognition_models_dir}")
+            main_logger.debug(f"- Using {ckpt_full_path}, {wav2vec2_base_960h_models_dir} and "
+                              f"{wav2vec_english_speech_emotion_recognition_models_dir}")
         else:
-            float_logger.debug(f"- Using combined model {opt.ckpt_path}")
+            main_logger.debug(f"- Using combined model {opt.ckpt_path}")
 
         agent = InferenceAgent(opt, node_root_path=node_root_path if unified else None)
 
-        float_logger.debug("FLOAT model pipe loaded successfully.")
+        main_logger.debug("FLOAT model pipe loaded successfully.")
 
         return (agent,)
 
@@ -189,10 +189,10 @@ class FloatProcess:
                 # Store original state and set new state
                 original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
                 torch.backends.cudnn.benchmark = float_pipe.opt.cudnn_benchmark_enabled
-                float_logger.debug(f"FloatProcess: Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}"
-                                   f" (was {original_cudnn_benchmark_state})")
+                main_logger.debug(f"FloatProcess: Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}"
+                                  f" (was {original_cudnn_benchmark_state})")
             else:
-                float_logger.debug("FloatProcess: Not a CUDA device or cuDNN not available, benchmark setting skipped.")
+                main_logger.debug("FloatProcess: Not a CUDA device or cuDNN not available, benchmark setting skipped.")
 
             float_pipe.G.to(float_pipe.rank)
             float_pipe.opt.fps = fps
@@ -208,7 +208,7 @@ class FloatProcess:
 
             # Loop for all image/audio pairs
             for i in range(target_batch_size):
-                float_logger.debug(f"Processing batch item {i+1}/{target_batch_size}")
+                main_logger.debug(f"Processing batch item {i+1}/{target_batch_size}")
 
                 # Select current image slice (B=1, H, W, C)
                 current_image_idx = min(i, image_batch_size - 1)
@@ -221,8 +221,8 @@ class FloatProcess:
                 current_ref_audio_slice_waveform = current_ref_audio_slice_waveform.to(float_pipe.rank)
                 current_ref_audio_dict = {'waveform': current_ref_audio_slice_waveform, 'sample_rate': audio_sample_rate}
 
-                float_logger.debug(current_ref_image_slice.shape)
-                float_logger.debug(current_ref_audio_slice_waveform.shape)
+                main_logger.debug(current_ref_image_slice.shape)
+                main_logger.debug(current_ref_audio_slice_waveform.shape)
 
                 images_thwc = float_pipe.run_inference(None, current_ref_image_slice, current_ref_audio_dict,
                                                        a_cfg_scale=a_cfg_scale, r_cfg_scale=float_pipe.opt.r_cfg_scale,
@@ -245,7 +245,7 @@ class FloatProcess:
             # Restore original cuDNN benchmark state
             if original_cudnn_benchmark_state is not None:
                 torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
-                float_logger.debug(f"FloatProcess: Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
+                main_logger.debug(f"FloatProcess: Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
 
             float_pipe.G.to(mm.unet_offload_device())
 
@@ -277,11 +277,11 @@ class FloatImageFaceAlign:
         # Defensive: ensure the tensor shape is as documented
         # Should be redundant
         if image.ndim == 3:
-            float_logger.warning("Missing batch size")
+            main_logger.warning("Missing batch size")
             image = image.unsqueeze(0)
         if image.ndim != 4:
             msg = f"Image shape is incorrect {image.shape}"
-            float_logger.error(msg)
+            main_logger.error(msg)
             raise ValueError(msg)
 
         batch_size = image.shape[0]
