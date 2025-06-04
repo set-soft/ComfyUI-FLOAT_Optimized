@@ -5,7 +5,6 @@
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
 from . import nodes
-from . import nodes_audio
 import inspect
 import logging
 
@@ -14,7 +13,7 @@ init_logger = logging.getLogger("FLOAT_Optimized.__init__")
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
-for name, obj in inspect.getmembers(nodes) + inspect.getmembers(nodes_audio):
+for name, obj in inspect.getmembers(nodes):
     if not inspect.isclass(obj) or not hasattr(obj, "INPUT_TYPES"):
         continue
     assert hasattr(obj, "UNIQUE_NAME"), f"No name for {obj.__name__}"
