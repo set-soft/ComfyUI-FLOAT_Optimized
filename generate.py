@@ -10,14 +10,13 @@
 
 import cv2
 from comfy.utils import ProgressBar
-import librosa
 import logging
 import os
 import numpy as np
 import torch
 from tqdm import tqdm
 from transformers import Wav2Vec2FeatureExtractor
-from typing import Union, Dict
+from typing import Dict
 
 from .models.float.FLOAT import FLOAT
 from .resample import comfy_audio_to_librosa_mono
@@ -67,15 +66,11 @@ class DataProcessor:
         # image transform
         self.transform = CustomTransform(opt.input_size)
 
-    def default_aud_loader(self, path: Union[str, Dict]) -> torch.Tensor:
-        if isinstance(path, dict):
-            # We support a native ComfyUI audio
-            # Wav2Vec needs 16k sampling rate
-            speech_array, sampling_rate = comfy_audio_to_librosa_mono(path['waveform'], path['sample_rate'],
-                                                                      self.sampling_rate), self.sampling_rate
-        else:
-            speech_array, sampling_rate = librosa.load(path, sr=self.sampling_rate)
-        return self.wav2vec_preprocessor(speech_array, sampling_rate=sampling_rate, return_tensors='pt').input_values[0]
+    def default_aud_loader(self, path: Dict) -> torch.Tensor:
+        # We support a native ComfyUI audio
+        # Wav2Vec needs 16k sampling rate
+        speech_array = comfy_audio_to_librosa_mono(path['waveform'], path['sample_rate'], self.sampling_rate)
+        return self.wav2vec_preprocessor(speech_array, sampling_rate=self.sampling_rate, return_tensors='pt').input_values[0]
 
     def preprocess(self, ref_img: torch.Tensor, ref_audio: Dict, no_crop: bool) -> dict:
         s = img_tensor_2_np_array(ref_img, self.opt.rgba_conversion, self.opt.bkg_color_hex)
