@@ -77,12 +77,12 @@ class DataProcessor:
             speech_array, sampling_rate = librosa.load(path, sr=self.sampling_rate)
         return self.wav2vec_preprocessor(speech_array, sampling_rate=sampling_rate, return_tensors='pt').input_values[0]
 
-    def preprocess(self, ref_img: torch.Tensor, audio_path: Dict, no_crop: bool) -> dict:
+    def preprocess(self, ref_img: torch.Tensor, ref_audio: Dict, no_crop: bool) -> dict:
         s = img_tensor_2_np_array(ref_img, self.opt.rgba_conversion, self.opt.bkg_color_hex)
         if not no_crop:
             s = process_img(s, self.input_size, self.opt.face_margin)
         s = self.transform(s).unsqueeze(0)
-        a = self.default_aud_loader(audio_path).unsqueeze(0)
+        a = self.default_aud_loader(ref_audio).unsqueeze(0)
         return {'s': s, 'a': a, 'p': None, 'e': None}
 
 
@@ -161,7 +161,7 @@ class InferenceAgent:
         self,
         res_video_path: str,
         ref_img: torch.Tensor,
-        audio_path: Dict,
+        ref_audio: Dict,
         a_cfg_scale: float = 2.0,
         r_cfg_scale: float = 1.0,
         e_cfg_scale: float = 1.0,
@@ -170,7 +170,7 @@ class InferenceAgent:
         no_crop: bool = False,
         seed: int = 25
     ) -> str:
-        data = self.data_processor.preprocess(ref_img, audio_path, no_crop=no_crop)
+        data = self.data_processor.preprocess(ref_img, ref_audio, no_crop=no_crop)
 
         # inference
         d_hat = self.G.inference(data=data, a_cfg_scale=a_cfg_scale, r_cfg_scale=r_cfg_scale, e_cfg_scale=e_cfg_scale,
