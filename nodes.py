@@ -52,6 +52,29 @@ def get_torch_device_options():
     return options
 
 
+# ##################################################################################
+# # Helper for cuDNN Benchmark
+# ##################################################################################
+
+@contextlib.contextmanager
+def manage_cudnn_benchmark(opt: BaseOptions):
+    """ Context manager to temporarily set and restore cudnn.benchmark state. """
+    original_cudnn_benchmark_state = None
+    is_cuda_device = opt.rank.type == 'cuda'
+
+    if is_cuda_device and hasattr(torch.backends, 'cudnn') and torch.backends.cudnn.is_available():
+        original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
+        if torch.backends.cudnn.benchmark != opt.cudnn_benchmark_enabled:
+            torch.backends.cudnn.benchmark = opt.cudnn_benchmark_enabled
+            main_logger.debug(f"Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}")
+    try:
+        yield
+    finally:
+        if original_cudnn_benchmark_state is not None:
+            torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
+            main_logger.debug(f"Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
+
+
 class LoadFloatModels:
     @classmethod
     def INPUT_TYPES(s):
@@ -267,6 +290,11 @@ class FloatProcess:
             float_pipe.G.to(mm.unet_offload_device())
 
 
+# ###############################################################################################################
+# Advanced nodes
+# ###############################################################################################################
+
+
 class FloatImageFaceAlign:
     @classmethod
     def INPUT_TYPES(cls):
@@ -418,29 +446,6 @@ class FloatAdvancedParameters:
         }
 
         return (options_dict,)
-
-
-# ##################################################################################
-# # Helper for cuDNN Benchmark
-# ##################################################################################
-
-@contextlib.contextmanager
-def manage_cudnn_benchmark(opt: BaseOptions):
-    """ Context manager to temporarily set and restore cudnn.benchmark state. """
-    original_cudnn_benchmark_state = None
-    is_cuda_device = opt.rank.type == 'cuda'
-
-    if is_cuda_device and hasattr(torch.backends, 'cudnn') and torch.backends.cudnn.is_available():
-        original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
-        if torch.backends.cudnn.benchmark != opt.cudnn_benchmark_enabled:
-            torch.backends.cudnn.benchmark = opt.cudnn_benchmark_enabled
-            main_logger.debug(f"Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}")
-    try:
-        yield
-    finally:
-        if original_cudnn_benchmark_state is not None:
-            torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
-            main_logger.debug(f"Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
 
 
 class FloatEncodeImageToLatents:
