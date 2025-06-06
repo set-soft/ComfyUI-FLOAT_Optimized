@@ -459,8 +459,8 @@ class FloatEncodeImageToLatents:
         }
 
     # Define a unique string for the custom feats dictionary type
-    RETURN_TYPES = ("TORCH_TENSOR", "TORCH_TENSOR", "FLOAT_FEATS_DICT")
-    RETURN_NAMES = ("s_r_latent", "r_s_lambda_latent", "s_r_feats_dict")
+    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_FEATS_DICT", "TORCH_TENSOR", "FLOAT_PIPE")
+    RETURN_NAMES = ("s_r_latent", "s_r_feats_dict", "r_s_lambda_latent", "float_pipe")
     FUNCTION = "encode_image_batch"
     CATEGORY = "FLOAT/Advanced"
     DESCRIPTION = "Encodes a batch of reference images into FLOAT latents (s_r, r_s_lambda, s_r_feats)."
@@ -527,7 +527,7 @@ class FloatEncodeImageToLatents:
                 # This node does not set agent.G.first_run = False.
                 # That should be handled by a node that completes the full pipeline
                 # or if this component itself is considered fully "warmed up".
-                return (s_r_latent_cpu, r_s_lambda_latent_cpu, s_r_feats_dict_cpu)
+                return (s_r_latent_cpu, s_r_feats_dict_cpu, r_s_lambda_latent_cpu, float_pipe)
 
             finally:
                 # --- Restore Pbar State (if changed) ---
@@ -549,8 +549,8 @@ class FloatGetIdentityReference:
             }
         }
 
-    RETURN_TYPES = ("TORCH_TENSOR",)
-    RETURN_NAMES = ("r_s_latent",)
+    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_PIPE")
+    RETURN_NAMES = ("r_s_latent", "float_pipe")
     FUNCTION = "get_identity_reference_batch"
     CATEGORY = "FLOAT/Advanced"
     DESCRIPTION = "Derives the batched identity reference latent (r_s) from r_s_lambda."
@@ -587,7 +587,7 @@ class FloatGetIdentityReference:
                 # --- Output Formatting ---
                 r_s_latent_batch_cpu = r_s_latent_batch_gpu.cpu()
 
-                return (r_s_latent_batch_cpu,)
+                return (r_s_latent_batch_cpu, float_pipe)
 
             finally:
                 agent.G.motion_autoencoder.dec.to(mm.unet_offload_device())
@@ -598,22 +598,22 @@ class FloatEncodeAudioToLatentWA:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "audio": ("AUDIO",),
                 "float_pipe": ("FLOAT_PIPE",),
+                "audio": ("AUDIO",),
                 # This FPS determines the video length, not the internal chunking
                 "fps": ("FLOAT", {"default": 25.0, "min": 1.0, "step": 0.1}),
             }
         }
 
-    RETURN_TYPES = ("TORCH_TENSOR", "INT", "TORCH_TENSOR")
-    RETURN_NAMES = ("wa_latent", "audio_num_frames", "preprocessed_audio")
+    RETURN_TYPES = ("TORCH_TENSOR", "INT", "TORCH_TENSOR", "FLOAT_PIPE")
+    RETURN_NAMES = ("wa_latent", "audio_num_frames", "preprocessed_audio", "float_pipe")
     FUNCTION = "encode_audio_to_wa"
     CATEGORY = "FLOAT/Advanced"
     DESCRIPTION = "Resamples, preprocesses a batch of audio (uniform length), and encodes it into WA."
     UNIQUE_NAME = "FloatEncodeAudioToLatentWA"
     DISPLAY_NAME = "FLOAT Encode Audio to latent wa"
 
-    def encode_audio_to_wa(self, audio: Dict, float_pipe: InferenceAgent, fps: float):
+    def encode_audio_to_wa(self, float_pipe: InferenceAgent, audio: Dict, fps: float):
         agent = float_pipe
         opt = agent.opt
 
@@ -684,7 +684,7 @@ class FloatEncodeAudioToLatentWA:
 
                 wa_latent_cpu = wa_latent_gpu.cpu()
 
-                return (wa_latent_cpu, audio_num_frames, preprocessed_audio_batched_cpu)
+                return (wa_latent_cpu, audio_num_frames, preprocessed_audio_batched_cpu, float_pipe)
 
             finally:
                 # opt.fps = original_agent_opt_fps
@@ -702,8 +702,8 @@ class FloatEncodeEmotionToLatentWE:
             }
         }
 
-    RETURN_TYPES = ("TORCH_TENSOR",)
-    RETURN_NAMES = ("we_latent",)
+    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_PIPE")
+    RETURN_NAMES = ("we_latent", "float_pipe")
     FUNCTION = "encode_emotion_to_we"
     CATEGORY = "FLOAT/Advanced"
     DESCRIPTION = "Encodes emotion (from audio or specified) into the WE latent."
@@ -757,7 +757,7 @@ class FloatEncodeEmotionToLatentWE:
                 # --- Output Formatting ---
                 we_latent_cpu = we_latent_gpu.cpu()
 
-                return (we_latent_cpu,)
+                return (we_latent_cpu, float_pipe)
 
             finally:
                 agent.G.emotion_encoder.to(mm.unet_offload_device())
@@ -770,8 +770,8 @@ class FloatSampleMotionSequenceRD:
             "required": {
                 "r_s_latent": ("TORCH_TENSOR",),
                 "wa_latent": ("TORCH_TENSOR",),
-                "we_latent": ("TORCH_TENSOR",),
                 "audio_num_frames": ("INT", {"forceInput": True}),
+                "we_latent": ("TORCH_TENSOR",),
                 "float_pipe": ("FLOAT_PIPE",),
                 "a_cfg_scale": ("FLOAT", {"default": 2.0, "min": 0.0, "max": 10.0, "step": 0.1}),
                 "e_cfg_scale": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.1}),
@@ -779,8 +779,8 @@ class FloatSampleMotionSequenceRD:
             }
         }
 
-    RETURN_TYPES = ("TORCH_TENSOR",)
-    RETURN_NAMES = ("r_d_latents",)
+    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_PIPE")
+    RETURN_NAMES = ("r_d_latents", "float_pipe")
     FUNCTION = "sample_rd_sequence"
     CATEGORY = "FLOAT/Advanced"
     DESCRIPTION = "Samples RD using FMT and ODE, with some ODE params from pipe's options."
@@ -788,7 +788,7 @@ class FloatSampleMotionSequenceRD:
     DISPLAY_NAME = "FLOAT Sample Motion Sequence rd"
 
     def sample_rd_sequence(self, r_s_latent: torch.Tensor, wa_latent: torch.Tensor,
-                           we_latent: torch.Tensor, audio_num_frames: int, float_pipe: InferenceAgent,
+                           audio_num_frames: int, we_latent: torch.Tensor, float_pipe: InferenceAgent,
                            a_cfg_scale: float, e_cfg_scale: float, seed: int):
         agent = float_pipe
         opt = agent.opt
@@ -913,7 +913,7 @@ class FloatSampleMotionSequenceRD:
                 r_d_latents_gpu = r_d_latents_full_gpu[:, :audio_num_frames, :]
                 r_d_latents_cpu = r_d_latents_gpu.cpu()
 
-                return (r_d_latents_cpu,)
+                return (r_d_latents_cpu, float_pipe)
 
             finally:
                 agent.G.fmt.to(mm.unet_offload_device())
@@ -931,8 +931,9 @@ class FloatDecodeLatentsToImages:
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)  # ComfyUI Standard: (B*T, H, W, C) on CPU
-    RETURN_NAMES = ("images",)
+    RETURN_TYPES = ("IMAGE",  # ComfyUI Standard: (B*T, H, W, C) on CPU
+                    "FLOAT", "FLOAT_PIPE")
+    RETURN_NAMES = ("images", "fps", "float_pipe")
     FUNCTION = "decode_latents_to_images"
     CATEGORY = "FLOAT/Advanced"
     DESCRIPTION = "Decodes FLOAT latents (SR, SR_feats, RD) into an image sequence."
@@ -970,7 +971,7 @@ class FloatDecodeLatentsToImages:
             dummy_h, dummy_w, dummy_c = opt.input_size, opt.input_size, opt.input_nc
             # Shape for IMAGE is (N, H, W, C). If T=0, then N = B*0 = 0.
             empty_images = torch.empty((0, dummy_h, dummy_w, dummy_c), dtype=torch.float32, device='cpu')
-            return (empty_images,)
+            return (empty_images, opt.fps, float_pipe)
 
         original_agent_pbar_ref = None
         # Total frames to show progress for is B * T
@@ -1014,7 +1015,7 @@ class FloatDecodeLatentsToImages:
                 else:
                     final_images_output_cpu = torch.cat(decoded_image_sequences_list, dim=0)
 
-                return (final_images_output_cpu,)
+                return (final_images_output_cpu, opt.fps, float_pipe)
 
             finally:
                 if hasattr(agent.G, 'pbar') and original_agent_pbar_ref is not None:
