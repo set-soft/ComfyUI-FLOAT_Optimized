@@ -313,7 +313,7 @@ class FloatImageFaceAlign:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     FUNCTION = "process"
-    CATEGORY = "FLOAT"
+    CATEGORY = "FLOAT/Advanced"
     DESCRIPTION = "Crops Crops to face, resizes, and handles RGBA to RGB conversion."
     UNIQUE_NAME = "FloatImageFaceAlign"
     DISPLAY_NAME = "Face Align for FLOAT"
@@ -422,7 +422,7 @@ class FloatAdvancedParameters:
     RETURN_TYPES = ("ADV_FLOAT_DICT",)
     RETURN_NAMES = ("advanced_options",)
     FUNCTION = "get_options"
-    CATEGORY = "FLOAT"
+    CATEGORY = "FLOAT/Advanced"
     DESCRIPTION = "FLOAT Advanced Options"
     UNIQUE_NAME = "FloatAdvancedParameters"
     DISPLAY_NAME = "FLOAT Advanced Options"
