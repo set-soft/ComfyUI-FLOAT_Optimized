@@ -5,3 +5,4 @@
 
 NODES_NAME = "FLOAT_Optimized"
 NODES_DEBUG_VAR = NODES_NAME.upper() + "_NODES_DEBUG"
+EMOTIONS = ['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
