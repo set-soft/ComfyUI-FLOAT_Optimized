@@ -6,6 +6,7 @@
 # Project: ComfyUI-Float_Optimized
 from . import nodes
 from . import nodes_adv
+from . import nodes_vadv
 import inspect
 import logging
 from .utils.misc import NODES_NAME
@@ -15,7 +16,7 @@ init_logger = logging.getLogger(f"{NODES_NAME}.__init__")
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
-for name, obj in inspect.getmembers(nodes) + inspect.getmembers(nodes_adv):
+for name, obj in inspect.getmembers(nodes) + inspect.getmembers(nodes_adv) + inspect.getmembers(nodes_vadv):
     if not inspect.isclass(obj) or not hasattr(obj, "INPUT_TYPES"):
         continue
     assert hasattr(obj, "UNIQUE_NAME"), f"No name for {obj.__name__}"
