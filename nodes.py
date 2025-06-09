@@ -4,7 +4,6 @@
 # Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
-import contextlib  # For context manager
 import math
 import numpy as np
 import os
@@ -21,6 +20,7 @@ import folder_paths
 from .options.base_options import BaseOptions
 from .utils.image import img_tensor_2_np_array, process_img
 from .utils.logger import main_logger
+from .utils.torch import get_torch_device_options, manage_cudnn_benchmark
 from .generate import InferenceAgent
 
 # List of fixed-step solvers you from torchdiffeq
@@ -39,40 +39,6 @@ RGBA_CONVERSION_STRATEGIES = [
     "replace_with_color"
 ]
 EMOTIONS = ['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
-
-
-def get_torch_device_options():
-    options = ["cpu"]
-    if torch.cuda.is_available():
-        options.append("cuda")  # Default CUDA device
-        for i in range(torch.cuda.device_count()):
-            options.append(f"cuda:{i}")  # Specific CUDA devices
-    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        options.append("mps")
-    return options
-
-
-# ##################################################################################
-# # Helper for cuDNN Benchmark
-# ##################################################################################
-
-@contextlib.contextmanager
-def manage_cudnn_benchmark(opt: BaseOptions):
-    """ Context manager to temporarily set and restore cudnn.benchmark state. """
-    original_cudnn_benchmark_state = None
-    is_cuda_device = opt.rank.type == 'cuda'
-
-    if is_cuda_device and hasattr(torch.backends, 'cudnn') and torch.backends.cudnn.is_available():
-        original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
-        if torch.backends.cudnn.benchmark != opt.cudnn_benchmark_enabled:
-            torch.backends.cudnn.benchmark = opt.cudnn_benchmark_enabled
-            main_logger.debug(f"Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}")
-    try:
-        yield
-    finally:
-        if original_cudnn_benchmark_state is not None:
-            torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
-            main_logger.debug(f"Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
 
 
 class LoadFloatModels:
