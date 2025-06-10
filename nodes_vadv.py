@@ -7,6 +7,7 @@ import logging
 import math
 import os
 import torch
+import torch.nn.functional as F
 # from tqdm import tqdm
 from typing import Dict  # , NewType
 # ComfyUI
@@ -16,11 +17,12 @@ import folder_paths
 from .options.base_options import BaseOptions
 from .utils.logger import main_logger
 from .utils.torch import get_torch_device_options
-from .utils.misc import NODES_NAME
+from .utils.misc import EMOTIONS, NODES_NAME
 
 logger = logging.getLogger(f"{NODES_NAME}.nodes_vadv")
 PROJECTIONS_DIR = "float/audio_projections"
 BASE_CATEGORY = "FLOAT/Very Advanced"
+ESPR = "wav2vec-english-speech-emotion-recognition"
 
 
 class LoadWav2VecModel:
@@ -470,3 +472,178 @@ class FloatApplyAudioProjection:
 
         # Output on CPU as per ComfyUI convention for intermediate tensors unless specified
         return (wa_latent_gpu.cpu(),)
+
+
+class LoadEmotionRecognitionModel:
+    UNIQUE_NAME = "LoadEmotionRecognitionModel"
+    DISPLAY_NAME = "Load Emotion Recognition Model"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        # Scan a dedicated folder or the general audio models folder
+        emotion_models_search_path = os.path.join(folder_paths.models_dir, "audio")  # Or "emotion_models"
+        if not os.path.isdir(emotion_models_search_path):
+            try:
+                os.makedirs(emotion_models_search_path, exist_ok=True)
+            except OSError:
+                pass
+
+        model_folders = ["No models found"]
+        if os.path.isdir(emotion_models_search_path):
+            folders = []
+            for f_name in os.listdir(emotion_models_search_path):
+                full_path = os.path.join(emotion_models_search_path, f_name)
+                if os.path.isdir(full_path) and os.path.exists(os.path.join(full_path, "config.json")):
+                    # Simple check, could be more specific for sequence classification models
+                    folders.append(f_name)
+            if folders:
+                model_folders = sorted(folders)
+
+        device_options = get_torch_device_options()
+        default_device = "cuda" if "cuda" in device_options else "cpu"
+        default_model = ESPR if ESPR in model_folders else model_folders[0]
+
+        return {
+            "required": {
+                "model_folder": (model_folders, {"default": default_model}),
+                "target_device": (device_options, {"default": default_device}),
+            }
+        }
+
+    RETURN_TYPES = ("EMOTION_MODEL_PIPE",)
+    RETURN_NAMES = ("emotion_model_pipe",)
+    FUNCTION = "load_emotion_model"
+    CATEGORY = BASE_CATEGORY + "/Loaders"
+
+    def load_emotion_model(self, model_folder: str, target_device: str):
+        from transformers import Wav2Vec2FeatureExtractor  # Standard one for Wav2Vec2 based models
+        from transformers import AutoConfig
+        from .models.wav2vec2_ser import Wav2Vec2ForSpeechClassification
+
+        if model_folder == "No models found":
+            raise FileNotFoundError("No emotion models found. Place Hugging Face model folders in "
+                                    f"'{os.path.join(folder_paths.models_dir, 'audio')}'.")
+
+        model_path = os.path.join(folder_paths.models_dir, "audio", model_folder)  # Adjust if using a different subfolder
+        if not os.path.isdir(model_path):
+            raise FileNotFoundError(f"Selected model folder not found: {model_path}")
+
+        logger.info(f"Loading Emotion Recognition model from: {model_path} to device {target_device}")
+        device = torch.device(target_device)
+
+        try:
+            config = AutoConfig.from_pretrained(model_path)
+            # Ensure the model loaded is for sequence classification
+            # Wav2Vec2ForSpeechClassification is what Audio2Emotion uses, which inherits Wav2Vec2PreTrainedModel
+            # This is a slightly different classification used by FLOAT: (different head)
+            emotion_model = Wav2Vec2ForSpeechClassification.from_pretrained(model_path, config=config, local_files_only=True)
+            feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_path)  # Emotion models usually bundle their FE
+
+            emotion_model.to(device)
+            emotion_model.eval()
+
+            # Store relevant config info, especially label mappings if available
+            model_config_dict = {
+                "num_labels": config.num_labels,
+                "id2label": config.id2label if hasattr(config, 'id2label') else None,
+                "label2id": config.label2id if hasattr(config, 'label2id') else None,
+                "sampling_rate": feature_extractor.sampling_rate if hasattr(feature_extractor, 'sampling_rate') else 16000,
+                "model_path": model_path
+            }
+
+            # emotion_model_pipe tuple: (model, feature_extractor, model_config_dict)
+            return ((emotion_model, feature_extractor, model_config_dict),)
+        except Exception as e:
+            logger.error(f"Error loading Emotion Recognition model from {model_path}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise
+
+
+class FloatExtractEmotionWithCustomModel:
+    UNIQUE_NAME = "FloatExtractEmotionWithCustomModel"
+    DISPLAY_NAME = "FLOAT Extract Emotion from Features (Very Advanced)"  # Name updated
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        emotion_options = EMOTIONS
+        return {
+            "required": {
+                "processed_audio_features": ("TORCH_TENSOR",),  # (B, NumSamplesAfterPrep) from a Wav2Vec2FeatureExtractor
+                "emotion_model_pipe": ("EMOTION_MODEL_PIPE",),   # (emotion_model, fe_for_emo_model_ref_only, config)
+                "emotion": (emotion_options, {"default": "none"}),
+            }
+        }
+
+    RETURN_TYPES = ("TORCH_TENSOR", "EMOTION_MODEL_PIPE")
+    RETURN_NAMES = ("we_latent", "emotion_model_pipe_out")
+    FUNCTION = "extract_emotion_from_features"  # Renamed function
+    CATEGORY = BASE_CATEGORY
+
+    def extract_emotion_from_features(self, processed_audio_features: torch.Tensor,
+                                      emotion_model_pipe: tuple,
+                                      emotion: str):
+        if not isinstance(emotion_model_pipe, tuple) or len(emotion_model_pipe) != 3:
+            raise TypeError("emotion_model_pipe is not in the expected format (model, feature_extractor_ref, config_dict).")
+
+        emotion_model, _feature_extractor_ref_emo, model_config_emo = emotion_model_pipe
+        # The _feature_extractor_ref_emo from the pipe is mostly for reference or if this node
+        # HAD to do its own FE. Since we now take processed_audio_features, it's less critical here.
+
+        current_rank_device = emotion_model.device
+
+        # --- Input Validation for processed_audio_features ---
+        if not isinstance(processed_audio_features, torch.Tensor):
+            raise TypeError("Input 'processed_audio_features' must be a torch.Tensor.")
+        # Expected shape: (B, NumSamplesAfterPrep) from a Wav2Vec2FeatureExtractor
+        if processed_audio_features.ndim != 2:
+            raise ValueError(f"Input 'processed_audio_features' must be a 2D tensor (Batch, NumSamplesAfterPrep), "
+                             f"got {processed_audio_features.ndim}D with shape {processed_audio_features.shape}.")
+
+        batch_size = processed_audio_features.shape[0]
+        audio_on_device_emo = processed_audio_features.to(current_rank_device)
+
+        # --- Emotion Prediction or One-Hot Encoding ---
+        we_latent_gpu = None
+        num_labels = model_config_emo.get("num_labels")
+        # id2label = model_config_emo.get("id2label") # Not strictly needed for output, but good for debug
+        label2id = model_config_emo.get("label2id")
+
+        if num_labels is None:
+            raise ValueError("Number of labels (num_labels) not found in emotion model config from pipe.")
+
+        selected_emotion_lower = str(emotion).lower()
+        emo_idx = None
+
+        # Determine emo_idx based on label2id from the loaded emotion model's config
+        if label2id and selected_emotion_lower != "none":
+            emo_idx = label2id.get(selected_emotion_lower)  # Default None if not found
+            if emo_idx is None:
+                logger.warning(f"Specified emotion '{selected_emotion_lower}' not found in loaded emotion model's "
+                               "label2id map. Predicting from audio instead.")
+        elif selected_emotion_lower != "none":  # No label2id map in config
+            logger.warning("label2id map not available in loaded emotion model config. Cannot use specified emotion "
+                           f"'{selected_emotion_lower}'. Predicting from audio.")
+
+        with torch.no_grad():
+            emotion_model.eval()
+            # Predict if "none" or if specified emotion is not valid/mappable
+            if selected_emotion_lower == "none" or emo_idx is None:
+                if selected_emotion_lower != "none" and emo_idx is None:  # Tried to specify but failed
+                    logger.info(f"Failed to map '{selected_emotion_lower}'. Predicting emotion from audio features.")
+                else:  # Explicitly "none" or successfully mapped emo_idx is None (should not happen if map exists)
+                    logger.info("Predicting emotion from audio features using custom model.")
+
+                # The `emotion_model` (Wav2Vec2ForSequenceClassification) directly takes `input_values`
+                # which is what `processed_audio_features` represents.
+                logits = emotion_model(input_values=audio_on_device_emo).logits  # (B, NumLabels)
+                scores_batch = F.softmax(logits, dim=-1)  # (B, NumLabels)
+                we_latent_gpu = scores_batch.unsqueeze(1)  # (B, 1, NumLabels)
+            else:  # Valid emo_idx found
+                logger.info(f"Using specified emotion: {selected_emotion_lower} (index {emo_idx}) for batch "
+                            f"size {batch_size}.")
+                one_hot_single = F.one_hot(torch.tensor(emo_idx, device=current_rank_device),
+                                           num_classes=num_labels).float()
+                we_latent_gpu = one_hot_single.unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1)  # (B, 1, NumLabels)
+
+        return (we_latent_gpu.cpu(), emotion_model_pipe)
