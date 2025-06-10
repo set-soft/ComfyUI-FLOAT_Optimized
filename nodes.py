@@ -15,11 +15,6 @@ from .utils.logger import main_logger
 from .utils.torch import get_torch_device_options
 from .generate import InferenceAgent
 
-RGBA_CONVERSION_STRATEGIES = [
-    "blend_with_color",
-    "discard_alpha",
-    "replace_with_color"
-]
 EMOTIONS = ['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 
 
