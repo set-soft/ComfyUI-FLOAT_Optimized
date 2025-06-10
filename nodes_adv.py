@@ -41,6 +41,7 @@ RGBA_CONVERSION_STRATEGIES = [
     "replace_with_color"
 ]
 logger = logging.getLogger(f"{NODES_NAME}.nodes_vadv")
+SUFFIX = "(Ad)"
 
 
 class FloatImageFaceAlign:
@@ -237,7 +238,7 @@ class FloatEncodeImageToLatents:
         local_comfy_pbar = None
         original_agent_pbar_ref = None
 
-        with manage_cudnn_benchmark(opt):
+        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
             try:
                 agent.G.to(opt.rank)
 
@@ -321,7 +322,7 @@ class FloatGetIdentityReference:
             raise ValueError(f"Dimension 1 of 'r_s_lambda_latent' should be opt.dim_m ({opt.dim_m}), "
                              f"got {r_s_lambda_latent.shape[1]}.")
 
-        with manage_cudnn_benchmark(opt):
+        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
             try:
                 agent.G.motion_autoencoder.dec.to(opt.rank)
                 r_s_lambda_dev = r_s_lambda_latent.to(opt.rank)
@@ -417,7 +418,7 @@ class FloatEncodeAudioToLatentWA:
         # original_agent_opt_fps = opt.fps
         opt.fps = fps
 
-        with manage_cudnn_benchmark(opt):
+        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
             try:
                 agent.G.audio_encoder.to(opt.rank)
                 audio_on_device = preprocessed_audio_batched_cpu.to(opt.rank)
@@ -473,7 +474,7 @@ class FloatEncodeEmotionToLatentWE:
 
         batch_size = preprocessed_audio.shape[0]
 
-        with manage_cudnn_benchmark(opt):
+        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
             try:
                 # emotion_encoder contains Wav2Vec2ForSpeechClassification model
                 agent.G.emotion_encoder.to(opt.rank)
@@ -597,7 +598,7 @@ class FloatSampleMotionSequenceRD:
         comfy_pbar = comfy.utils.ProgressBar(total_num_chunks)
         logger.info(f"Starting ODE sampling for {batch_size} item(s) over {total_num_chunks} chunks.")
 
-        with manage_cudnn_benchmark(opt):
+        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
             try:
                 agent.G.fmt.to(opt.rank)
                 r_s_latent_dev = r_s_latent.to(opt.rank)
@@ -729,7 +730,7 @@ class FloatDecodeLatentsToImages:
             original_agent_pbar_ref = agent.G.pbar
         agent.G.pbar = comfy_pbar_decode
 
-        with manage_cudnn_benchmark(opt):
+        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
             try:
                 agent.G.motion_autoencoder.dec.to(opt.rank)
 

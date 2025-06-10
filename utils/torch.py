@@ -27,15 +27,15 @@ def get_torch_device_options():
 # ##################################################################################
 
 @contextlib.contextmanager
-def manage_cudnn_benchmark(opt):
+def manage_cudnn_benchmark(cudnn_enabled_flag: bool, device: torch.device):
     """ Context manager to temporarily set and restore cudnn.benchmark state. """
     original_cudnn_benchmark_state = None
-    is_cuda_device = opt.rank.type == 'cuda'
+    is_cuda_device = device.type == 'cuda'
 
     if is_cuda_device and hasattr(torch.backends, 'cudnn') and torch.backends.cudnn.is_available():
         original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
-        if torch.backends.cudnn.benchmark != opt.cudnn_benchmark_enabled:
-            torch.backends.cudnn.benchmark = opt.cudnn_benchmark_enabled
+        if torch.backends.cudnn.benchmark != cudnn_enabled_flag:
+            torch.backends.cudnn.benchmark = cudnn_enabled_flag
             logger.debug(f"Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}")
     try:
         yield
