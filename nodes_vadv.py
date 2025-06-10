@@ -9,20 +9,26 @@ import os
 import torch
 import torch.nn.functional as F
 # from tqdm import tqdm
-from typing import Dict  # , NewType
+from typing import List, Dict  # , NewType
 # ComfyUI
 import comfy.utils
+import comfy.model_management as mm
 import folder_paths
 
 from .options.base_options import BaseOptions
 from .utils.logger import main_logger
-from .utils.torch import get_torch_device_options
+from .utils.torch import get_torch_device_options, manage_cudnn_benchmark
 from .utils.misc import EMOTIONS, NODES_NAME
+from .models.float.encoder import Encoder as FloatEncoderModule
+from .models.float.styledecoder import Synthesis as FloatSynthesisModule
+from .models.misc import CHANNELS_MAP
 
 logger = logging.getLogger(f"{NODES_NAME}.nodes_vadv")
 PROJECTIONS_DIR = "float/audio_projections"
+MOTION_AE_DIR = "float/motion_autoencoder"
 BASE_CATEGORY = "FLOAT/Very Advanced"
 ESPR = "wav2vec-english-speech-emotion-recognition"
+SUFFIX = "(VA)"
 
 
 class LoadWav2VecModel:
@@ -72,69 +78,8 @@ class LoadWav2VecModel:
 
     RETURN_TYPES = ("WAV2VEC_PIPE",)  # Pipe: (model, feature_extractor, effective_options)
     RETURN_NAMES = ("wav2vec_pipe",)
-    # FUNCTION = "load_hf_wav2vec_model"
     FUNCTION = "load_float_wav2vec_model"
     CATEGORY = BASE_CATEGORY + "/Loaders"
-
-    def load_hf_wav2vec_model(self, model_folder: str, target_device: str, advanced_float_options: Dict = None):
-        from transformers import Wav2Vec2Model as HFWav2Vec2Model
-        from transformers import Wav2Vec2FeatureExtractor as HFWav2Vec2FeatureExtractor
-        from transformers import AutoConfig
-        from copy import deepcopy
-
-        if model_folder == "No models found in models/audio/":
-            raise FileNotFoundError("No Wav2Vec models found. Please place Hugging Face model folders (e.g., "
-                                    "'wav2vec2-base-960h') into the 'ComfyUI/models/audio/' directory.")
-
-        model_path = os.path.join(folder_paths.models_dir, "audio", model_folder)
-        if not os.path.isdir(model_path):
-            # This case should ideally be prevented by the dropdown logic, but good to have.
-            raise FileNotFoundError(f"Selected model folder not found: {model_path}")
-
-        main_logger.info(f"Loading Hugging Face Wav2Vec model from: {model_path} to device {target_device}")
-
-        device = torch.device(target_device)
-
-        try:
-            config = AutoConfig.from_pretrained(model_path)
-            # Load the base Hugging Face model. This does NOT include custom interpolation from FloatWav2VecModel.
-            wav2vec_model = HFWav2Vec2Model.from_pretrained(model_path, config=config)
-            feature_extractor = HFWav2Vec2FeatureExtractor.from_pretrained(model_path)
-
-            wav2vec_model.to(device)
-            wav2vec_model.eval()
-
-            # --- Prepare effective_options_dict ---
-            # Get the default from BaseOptions itself for consistency
-            base_opt_defaults = BaseOptions()  # Create a temporary instance to get defaults
-            effective_options = {
-                "sampling_rate": base_opt_defaults.sampling_rate,  # Std for Wav2Vec2, but feature_extractor might specify
-                "only_last_features": base_opt_defaults.only_last_features,
-                "wav2vec_sec": base_opt_defaults.wav2vec_sec,
-                "fps": base_opt_defaults.fps,
-                "dim_w": base_opt_defaults.dim_w,
-            }
-
-            # Update with model-specifics from its config
-            effective_options["hf_model_hidden_size"] = config.hidden_size
-            if hasattr(feature_extractor, 'sampling_rate') and feature_extractor.sampling_rate:
-                effective_options["sampling_rate"] = feature_extractor.sampling_rate
-
-            # Override with user-provided advanced_float_options
-            if advanced_float_options:
-                # Ensure we don't modify the input dict if it's passed around
-                options_to_merge = deepcopy(advanced_float_options)
-                effective_options.update(options_to_merge)
-                main_logger.info(f"Applied advanced_float_options: {options_to_merge}")
-
-            main_logger.info(f"Effective options for loaded Wav2Vec: {effective_options}")
-
-            return ((wav2vec_model, feature_extractor, effective_options),)
-        except Exception as e:
-            main_logger.error(f"Error loading Wav2Vec model from {model_path}: {e}")
-            import traceback
-            main_logger.error(traceback.format_exc())
-            raise
 
     def load_float_wav2vec_model(self, model_folder: str, target_device: str, advanced_float_options: Dict = None):
         # We import HFWav2Vec2Model only to load its state_dict, not to return it.
@@ -218,7 +163,7 @@ class LoadWav2VecModel:
 
 class FloatAudioPreprocessAndFeatureExtract:
     UNIQUE_NAME = "FloatAudioPreprocessAndFeatureExtract"
-    DISPLAY_NAME = "FLOAT Audio Feature Extract (Very Advanced)"  # Slightly shorter name
+    DISPLAY_NAME = "FLOAT Audio Feature Extract"  # Slightly shorter name
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -327,7 +272,7 @@ class FloatAudioPreprocessAndFeatureExtract:
 
 class LoadAudioProjectionLayer:
     UNIQUE_NAME = "LoadAudioProjectionLayer"
-    DISPLAY_NAME = "Load Audio Projection Layer (Very Advanced)"
+    DISPLAY_NAME = "Load Audio Projection Layer"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -432,7 +377,7 @@ class LoadAudioProjectionLayer:
 
 class FloatApplyAudioProjection:
     UNIQUE_NAME = "FloatApplyAudioProjection"
-    DISPLAY_NAME = "FLOAT Apply Audio Projection (Very Advanced)"
+    DISPLAY_NAME = "FLOAT Apply Audio Projection"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -562,7 +507,7 @@ class LoadEmotionRecognitionModel:
 
 class FloatExtractEmotionWithCustomModel:
     UNIQUE_NAME = "FloatExtractEmotionWithCustomModel"
-    DISPLAY_NAME = "FLOAT Extract Emotion from Features (Very Advanced)"  # Name updated
+    DISPLAY_NAME = "FLOAT Extract Emotion from Features"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -647,3 +592,559 @@ class FloatExtractEmotionWithCustomModel:
                 we_latent_gpu = one_hot_single.unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1)  # (B, 1, NumLabels)
 
         return (we_latent_gpu.cpu(), emotion_model_pipe)
+
+
+class LoadFloatEncoderModel:
+    UNIQUE_NAME = "LoadFloatEncoderModel"
+    DISPLAY_NAME = "Load FLOAT Encoder"
+    DEFAULT_ENCODER_FILENAME = "encoder.safetensors"
+    CATEGORY = BASE_CATEGORY + "/Loaders"
+
+    _INV_CHANNELS_MAP_TEMP = {}
+    for k, v_or_list in CHANNELS_MAP.items():
+        vs = v_or_list if isinstance(v_or_list, list) else [v_or_list]
+        for v_item in vs:
+            if v_item not in _INV_CHANNELS_MAP_TEMP:
+                _INV_CHANNELS_MAP_TEMP[v_item] = []
+            _INV_CHANNELS_MAP_TEMP[v_item].append(k)
+    INV_CHANNELS_MAP = {v: max(sizes) for v, sizes in _INV_CHANNELS_MAP_TEMP.items()}
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        encoder_weights_path = os.path.join(folder_paths.models_dir, MOTION_AE_DIR)
+        if not os.path.isdir(encoder_weights_path):
+            try:
+                os.makedirs(encoder_weights_path, exist_ok=True)
+            except OSError:
+                pass
+
+        weight_files = []
+        if os.path.isdir(encoder_weights_path):
+            weight_files = sorted([f for f in os.listdir(encoder_weights_path) if f.endswith(".safetensors")])
+
+        if cls.DEFAULT_ENCODER_FILENAME in weight_files:
+            weight_files.remove(cls.DEFAULT_ENCODER_FILENAME)
+            weight_files.insert(0, cls.DEFAULT_ENCODER_FILENAME)
+        elif not weight_files:
+            weight_files.append("No encoder files found")
+        if not weight_files:  # Should not happen with logic above, but defensive
+            weight_files = ["No encoder files found"]
+
+        device_options = get_torch_device_options()
+        default_device = "cuda" if "cuda" in device_options else "cpu"
+
+        return {
+            "required": {
+                "encoder_file": (weight_files,),
+                "target_device": (device_options, {"default": default_device}),
+                "cudnn_benchmark": ("BOOLEAN", {"default": False}),  # Added CUDNN option here
+            }
+        }
+
+    # Outputting inferred dimensions for user information / optional wiring
+    RETURN_TYPES = ("FLOAT_ENCODER_MODEL", "INT", "INT", "INT")
+    RETURN_NAMES = ("float_encoder", "inferred_input_size", "inferred_style_dim_w", "inferred_motion_dim_m")
+    FUNCTION = "load_encoder_infer_arch"
+
+    def load_encoder_infer_arch(self, encoder_file: str, target_device: str, cudnn_benchmark: bool):
+        if encoder_file == "No encoder files found":
+            raise FileNotFoundError(f"No encoder .safetensors files in 'models/{MOTION_AE_DIR}/'.")
+
+        weights_path = os.path.join(folder_paths.models_dir, MOTION_AE_DIR, encoder_file)
+        if not os.path.exists(weights_path):
+            raise FileNotFoundError(f"Encoder weights file not found: {weights_path}")
+
+        logger.info(f"Loading Encoder weights from {weights_path} to infer architecture.")
+
+        loaded_sd = None
+        try:
+            if hasattr(comfy.utils, 'load_torch_file'):
+                loaded_sd = comfy.utils.load_torch_file(weights_path, safe_load=True, device=torch.device("cpu"))
+            else:
+                from safetensors.torch import load_file
+                loaded_sd = load_file(weights_path, device="cpu")
+        except Exception as e:
+            logger.error(f"Error loading weights file {weights_path}: {e}")
+            raise
+
+        inferred_input_size = None
+        inferred_style_dim_w = None
+        inferred_motion_dim_m = None
+
+        try:
+            # Infer motion_dim_m
+            motion_dim_key = 'fc.4.weight'
+            if motion_dim_key not in loaded_sd:
+                raise KeyError(f"Key '{motion_dim_key}' not found for motion_dim inference.")
+            inferred_motion_dim_m = loaded_sd[motion_dim_key].shape[0]
+
+            # Infer style_dim_w
+            style_dim_key = 'fc.0.weight'
+            if style_dim_key not in loaded_sd:
+                raise KeyError(f"Key '{style_dim_key}' not found for style_dim_w inference.")
+            inferred_style_dim_w = loaded_sd[style_dim_key].shape[0]
+
+            # Infer input_size
+            first_conv_key_primary = 'net_app.convs.0.0.weight'
+            first_conv_key_fallback = 'net_app.convs.0.weight'
+            first_conv_actual_key = None
+            if first_conv_key_primary in loaded_sd:
+                first_conv_actual_key = first_conv_key_primary
+            elif first_conv_key_fallback in loaded_sd:
+                first_conv_actual_key = first_conv_key_fallback
+            else:
+                raise KeyError(f"Keys for first conv ('{first_conv_key_primary}' or '{first_conv_key_fallback}') not found.")
+            out_channels_first_conv = loaded_sd[first_conv_actual_key].shape[0]
+
+            if out_channels_first_conv not in self.INV_CHANNELS_MAP:
+                raise ValueError(f"Cannot infer input_size: Out channels ({out_channels_first_conv}) "
+                                 f"not in INV_CHANNELS_MAP. Map: {self.INV_CHANNELS_MAP}")
+            inferred_input_size = self.INV_CHANNELS_MAP[out_channels_first_conv]
+
+            logger.info(f"Inferred Encoder Arch: size={inferred_input_size}, "
+                        f"style_dim_w={inferred_style_dim_w}, motion_dim_m={inferred_motion_dim_m}")
+        except KeyError as e:
+            logger.error(f"Could not infer arch from weights: {e}. Check file structure.")
+            raise
+        except Exception as e:
+            logger.error(f"Error during arch inference: {e}")
+            raise
+
+        encoder_model = FloatEncoderModule(size=inferred_input_size, dim=inferred_style_dim_w,
+                                           dim_motion=inferred_motion_dim_m)
+
+        try:
+            m, u = encoder_model.load_state_dict(loaded_sd, strict=True)
+            if m:
+                logger.warning(f"Encoder: Missing keys: {m}")
+            if u:
+                logger.warning(f"Encoder: Unexpected keys: {u}")
+        except Exception as e:
+            logger.error(f"Error applying weights to Encoder: {e}")
+            raise
+
+        # Store inferred and provided relevant parameters on the instance
+        encoder_model.inferred_input_size = inferred_input_size
+        encoder_model.inferred_style_dim_w = inferred_style_dim_w
+        encoder_model.inferred_motion_dim_m = inferred_motion_dim_m
+        encoder_model.cudnn_benchmark_setting = cudnn_benchmark  # Store this setting
+
+        device = torch.device(target_device)
+        encoder_model.to(device)
+        encoder_model.eval()
+        logger.info(f"FLOAT Encoder (inferred arch) loaded to {target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
+
+        return (encoder_model, inferred_input_size, inferred_style_dim_w, inferred_motion_dim_m)
+
+
+class ApplyFloatEncoder:
+    UNIQUE_NAME = "ApplyFloatEncoder"
+    DISPLAY_NAME = "Apply FLOAT Encoder"
+    CATEGORY = BASE_CATEGORY
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "ref_image": ("IMAGE",),
+                "float_encoder": ("FLOAT_ENCODER_MODEL",),
+            }
+        }
+
+    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_FEATS_DICT", "TORCH_TENSOR", "FLOAT_ENCODER_MODEL")
+    RETURN_NAMES = ("s_r_latent", "s_r_feats_dict", "r_s_lambda_latent", "float_encoder_out")
+    FUNCTION = "apply_encoder"
+
+    def apply_encoder(self, ref_image: torch.Tensor, float_encoder: FloatEncoderModule):
+
+        # Get settings from the float_encoder instance
+        encoder_device = next(float_encoder.parameters()).device
+        cudnn_benchmark_to_use = float_encoder.cudnn_benchmark_setting
+
+        # For validation, get structural params from encoder instance
+        # And general params like input_nc from BaseOptions defaults
+        input_size = float_encoder.inferred_input_size
+
+        # Get input_nc from BaseOptions for validation consistency with integrated pipeline
+        # This assumes ApplyFloatEncoder should validate against typical FLOAT input.
+        base_opts_for_validation = BaseOptions()
+        input_nc = base_opts_for_validation.input_nc
+
+        if not isinstance(ref_image, torch.Tensor):
+            raise TypeError("Input 'ref_image' must be a torch.Tensor.")
+        if ref_image.ndim != 4:
+            raise ValueError(f"Input 'ref_image' is {ref_image.ndim}D, must be 4D (B, H, W, C).")
+
+        _batch_size, height, width, channels = ref_image.shape
+        if height != input_size or width != input_size:
+            raise ValueError(f"Image size {height}x{width} does not match Encoder's inferred input_size {input_size}.")
+        if channels != input_nc:
+            raise ValueError(f"Image channels {channels} does not match expected input_nc {input_nc}.")
+
+        local_comfy_pbar = None  # No pbar for this apply node for now
+
+        # Use the simplified CUDNN context manager
+        with manage_cudnn_benchmark(cudnn_benchmark_to_use, encoder_device):
+            # float_encoder is already on its target_device from the loader.
+
+            s_for_encoder = ref_image.permute(0, 3, 1, 2).contiguous()
+            s_for_encoder = (s_for_encoder * 2.0) - 1.0
+            s_for_encoder = s_for_encoder.to(encoder_device)
+
+            float_encoder.eval()
+            with torch.no_grad():
+                s_r_batch_gpu, r_s_lambda_intermediate, s_r_feats_batch_list_gpu = \
+                    float_encoder(input_source=s_for_encoder, input_target=None, h_start=None, pbar=local_comfy_pbar)
+
+                if r_s_lambda_intermediate is None:  # Should be None if input_target is None
+                    r_s_lambda_batch_gpu = float_encoder.fc(s_r_batch_gpu)
+                else:  # This path should ideally not be taken with current usage
+                    r_s_lambda_batch_gpu = r_s_lambda_intermediate
+
+            s_r_latent_cpu = s_r_batch_gpu.cpu()
+            r_s_lambda_latent_cpu = r_s_lambda_batch_gpu.cpu()
+            s_r_feats_cpu_list = [feat.cpu() for feat in s_r_feats_batch_list_gpu]
+            s_r_feats_dict_cpu = {"value": s_r_feats_cpu_list}
+
+            return (s_r_latent_cpu, s_r_feats_dict_cpu, r_s_lambda_latent_cpu, float_encoder)
+
+
+class LoadFloatSynthesisModel:
+    UNIQUE_NAME = "LoadFloatSynthesisModel"
+    DISPLAY_NAME = "Load FLOAT Synthesis"
+    DEFAULT_SYNTHESIS_FILENAME = "decoder.safetensors"  # Corrected to decoder
+    CATEGORY = BASE_CATEGORY + "/Loaders"
+
+    _INV_CHANNELS_MAP_TEMP = {}  # Same INV_CHANNELS_MAP as for Encoder
+    for k, v_or_list in CHANNELS_MAP.items():
+        vs = v_or_list if isinstance(v_or_list, list) else [v_or_list]
+        for v_item in vs:
+            if v_item not in _INV_CHANNELS_MAP_TEMP:
+                _INV_CHANNELS_MAP_TEMP[v_item] = []
+            _INV_CHANNELS_MAP_TEMP[v_item].append(k)
+    INV_CHANNELS_MAP = {v: max(sizes) for v, sizes in _INV_CHANNELS_MAP_TEMP.items()}
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        synth_weights_path = os.path.join(folder_paths.models_dir, MOTION_AE_DIR)
+        if not os.path.isdir(synth_weights_path):
+            try:
+                os.makedirs(synth_weights_path, exist_ok=True)
+            except OSError:
+                pass
+
+        weight_files = []  # Logic for file listing (same as LoadFloatEncoderModel)
+        if os.path.isdir(synth_weights_path):
+            weight_files = sorted([f for f in os.listdir(synth_weights_path) if f.endswith(".safetensors")])
+        if cls.DEFAULT_SYNTHESIS_FILENAME in weight_files:
+            weight_files.remove(cls.DEFAULT_SYNTHESIS_FILENAME)
+            weight_files.insert(0, cls.DEFAULT_SYNTHESIS_FILENAME)
+        elif not weight_files:
+            weight_files.append("No synthesis files found")
+        if not weight_files:
+            weight_files = ["No synthesis files found"]
+
+        device_options = get_torch_device_options()
+        default_device = "cuda" if "cuda" in device_options else "cpu"
+
+        # Defaults for required architectural choices not easily inferred
+        from .options.base_options import BaseOptions  # For these defaults
+        base_opts = BaseOptions()
+
+        return {
+            "required": {
+                "synthesis_file": (weight_files,),
+                "target_device": (device_options, {"default": default_device}),
+                "channel_multiplier": ("INT", {"default": base_opts.channel_multiplier
+                                       if hasattr(base_opts, 'channel_multiplier') else 1, "min": 1, "max": 8}),
+                "blur_kernel_str": ("STRING", {"default": str(base_opts.blur_kernel
+                                    if hasattr(base_opts, 'blur_kernel') else [1, 3, 3, 1])}),  # e.g., "[1,3,3,1]"
+                "cudnn_benchmark": ("BOOLEAN", {"default": False}),
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT_SYNTHESIS_MODEL", "INT", "INT", "INT")
+    RETURN_NAMES = ("float_synthesis", "inferred_size", "inferred_style_dim", "inferred_motion_dim")
+    FUNCTION = "load_synthesis_infer_arch"
+
+    def load_synthesis_infer_arch(self, synthesis_file: str, target_device: str,
+                                  channel_multiplier: int, blur_kernel_str: str,
+                                  cudnn_benchmark: bool):
+        if synthesis_file == "No synthesis files found":
+            raise FileNotFoundError(f"No synthesis .safetensors files in 'models/{MOTION_AE_DIR}/'.")
+
+        weights_path = os.path.join(folder_paths.models_dir, MOTION_AE_DIR, synthesis_file)
+        if not os.path.exists(weights_path):
+            raise FileNotFoundError(f"Synthesis weights file not found: {weights_path}")
+
+        try:
+            blur_kernel = eval(blur_kernel_str)  # Evaluate string to list
+            if not (isinstance(blur_kernel, list) and all(isinstance(x, int) for x in blur_kernel)):
+                raise ValueError("Blur kernel must be a list of integers (e.g., '[1,3,3,1]')")
+        except Exception as e:
+            raise ValueError(f"Invalid blur_kernel_str format: {e}. Must be Python list syntax e.g. '[1,3,3,1]'")
+
+        logger.info(f"Loading Synthesis weights from {weights_path} to CPU to infer architecture.")
+        loaded_sd = None
+        try:
+            cpu_device = torch.device("cpu")
+            if hasattr(comfy.utils, 'load_torch_file'):
+                loaded_sd = comfy.utils.load_torch_file(weights_path, safe_load=True, device=cpu_device)
+            else:
+                from safetensors.torch import load_file
+                loaded_sd = load_file(weights_path, device="cpu")
+        except Exception as e:
+            logger.error(f"Error loading weights file {weights_path}: {e}")
+            raise
+
+        inferred_size = None
+        inferred_style_dim = None
+        inferred_motion_dim = None
+
+        try:
+            # 1. Infer style_dim (from conv1.conv.modulation.weight)
+            #    Key: 'conv1.conv.modulation.weight', Shape: (in_channel_of_conv1, style_dim)
+            #    The EqualLinear for modulation has weight (in_channel_of_mod_conv, style_dim)
+            #    No, it's (in_channel_of_conv1, style_dim_of_modulation_network=style_dim)
+            #    The modulation layer itself: EqualLinear(style_dim, in_channel, bias_init=1)
+            #    Weight shape: (in_channel, style_dim)
+            style_dim_key = 'conv1.conv.modulation.weight'  # Modulation of the first StyledConv
+            if style_dim_key not in loaded_sd:
+                raise KeyError(f"Key '{style_dim_key}' for style_dim inference not found.")
+            inferred_style_dim = loaded_sd[style_dim_key].shape[1]  # style_dim is the second dimension
+
+            # 2. Infer motion_dim (from direction.weight)
+            #    Key: 'direction.weight', Shape: (style_dim_for_qr_maybe_512, motion_dim)
+            motion_dim_key = 'direction.weight'
+            if motion_dim_key not in loaded_sd:
+                raise KeyError(f"Key '{motion_dim_key}' for motion_dim inference not found.")
+            inferred_motion_dim = loaded_sd[motion_dim_key].shape[1]
+
+            # 3. Infer size (from input.input constant parameter's channel dimension)
+            #    Key: 'input.input', Shape: (1, channels[4], 4, 4)
+            #    The channel dimension is channels[4], which is fixed at 512 in the CHANNELS_MAP.
+            #    This means channels[4] = 512 for the ConstantInput.
+            #    The `size` parameter for Synthesis determines log_size and thus number of layers.
+            #    The number of layers (e.g., in self.convs) is (log_size - 2) * 2.
+            #    Example: size=512 -> log_size=9. num_conv_pairs = 7. Total convs items = 14.
+            #    We can count the number of 'convs.X...' keys or 'to_rgbs.X...' keys.
+            num_torgb_layers = 0
+            for k in loaded_sd.keys():
+                if k.startswith("to_rgbs.") and k.endswith(".conv.0.weight"):  # Counting distinct ToRGB blocks
+                    # Key example: to_rgbs.0.conv.0.weight, to_rgbs.1.conv.0.weight ...
+                    # The index of to_rgbs goes from 0 to (log_size - 3)
+                    layer_idx_str = k.split('.')[1]
+                    if layer_idx_str.isdigit():
+                        num_torgb_layers = max(num_torgb_layers, int(layer_idx_str) + 1)
+
+            if num_torgb_layers == 0:
+                raise ValueError("Could not determine number of to_rgb layers to infer size.")
+
+            # num_torgb_layers = (log_size - 2) (since to_rgbs list is for i in range(3, log_size + 1))
+            # Example: size=512, log_size=9. Range(3,10) -> i=3,4,5,6,7,8,9. Length is 7.
+            # So, num_torgb_layers = log_size - 2.
+            # log_size = num_torgb_layers + 2
+            inferred_log_size = num_torgb_layers + 2
+            inferred_size = 2 ** inferred_log_size
+
+            logger.info(f"Inferred Synthesis Architecture: size={inferred_size}, "
+                        f"style_dim={inferred_style_dim}, motion_dim={inferred_motion_dim}")
+
+        except KeyError as e:
+            logger.error(f"Could not infer architecture from Synthesis weights: {e}.")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during Synthesis architecture inference: {e}")
+            raise
+
+        synthesis_model = FloatSynthesisModule(
+            size=inferred_size,
+            style_dim=inferred_style_dim,
+            motion_dim=inferred_motion_dim,
+            channel_multiplier=channel_multiplier,  # From user input
+            blur_kernel=blur_kernel                 # From user input
+        )
+
+        try:
+            m, u = synthesis_model.load_state_dict(loaded_sd, strict=True)
+            if m:
+                logger.warning(f"Synthesis: Missing keys: {m}")
+            if u:
+                logger.warning(f"Synthesis: Unexpected keys: {u}")
+        except Exception as e:
+            logger.error(f"Error applying loaded weights to Synthesis: {e}")
+            raise
+
+        synthesis_model.inferred_size = inferred_size
+        synthesis_model.inferred_style_dim = inferred_style_dim
+        synthesis_model.inferred_motion_dim = inferred_motion_dim
+        synthesis_model.channel_multiplier_setting = channel_multiplier  # Store user-set hyperparams
+        synthesis_model.blur_kernel_setting = blur_kernel
+        synthesis_model.cudnn_benchmark_setting = cudnn_benchmark
+
+        device = torch.device(target_device)
+        synthesis_model.to(device)
+        synthesis_model.eval()
+        logger.info(f"FLOAT Synthesis (inferred arch) loaded to {target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
+
+        return (synthesis_model, inferred_size, inferred_style_dim, inferred_motion_dim)
+
+
+class ApplyFloatSynthesis:
+    UNIQUE_NAME = "ApplyFloatSynthesis"
+    DISPLAY_NAME = "Apply FLOAT Synthesis"
+    CATEGORY = BASE_CATEGORY
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "s_r_latent": ("TORCH_TENSOR",),
+                "s_r_feats_dict": ("FLOAT_FEATS_DICT",),
+                "r_d_latents": ("TORCH_TENSOR",),
+                "float_synthesis": ("FLOAT_SYNTHESIS_MODEL",),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "FLOAT_SYNTHESIS_MODEL")
+    RETURN_NAMES = ("images", "float_synthesis_out")
+    FUNCTION = "apply_synthesis"
+
+    def apply_synthesis(self, s_r_latent: torch.Tensor,
+                        s_r_feats_dict: Dict[str, List[torch.Tensor]],
+                        r_d_latents: torch.Tensor,
+                        float_synthesis: FloatSynthesisModule):
+
+        synthesis_device = next(float_synthesis.parameters()).device
+        cudnn_benchmark_to_use = float_synthesis.cudnn_benchmark_setting
+
+        # Get structural params for validation if needed, and general defaults
+        # input_size for output shape validation
+        # synthesis_input_size = float_synthesis.inferred_size # Stored by loader
+        # For creating empty image tensor if T=0:
+        from .options.base_options import BaseOptions
+        base_opts_for_validation = BaseOptions()
+        output_img_size = getattr(float_synthesis, 'inferred_size', base_opts_for_validation.input_size)
+        output_img_nc = base_opts_for_validation.input_nc  # Usually 3
+
+        # --- Input Validation ---
+        if not all(isinstance(t, torch.Tensor) for t in [s_r_latent, r_d_latents]):
+            raise TypeError("s_r_latent and r_d_latents must be torch.Tensors.")
+        if (not isinstance(s_r_feats_dict, dict) or "value" not in s_r_feats_dict or
+           not isinstance(s_r_feats_dict["value"], list)):
+            raise TypeError("s_r_feats_dict format error.")
+        if not all(isinstance(t, torch.Tensor) for t in s_r_feats_dict["value"]):
+            raise TypeError("s_r_feats_dict['value'] must be a list of Tensors.")
+
+        batch_size = s_r_latent.shape[0]
+        if not (r_d_latents.shape[0] == batch_size and
+                all(feat.shape[0] == batch_size for feat in s_r_feats_dict["value"])):
+            raise ValueError("Batch size mismatch in inputs for Synthesis.")
+
+        num_frames_to_decode = r_d_latents.shape[1]
+        if num_frames_to_decode == 0:
+            logger.warning("r_d_latents has 0 frames. Returning empty image batch.")
+            empty_images = torch.empty((0, output_img_size, output_img_size, output_img_nc), dtype=torch.float32, device='cpu')
+            return (empty_images, float_synthesis)
+
+        comfy_pbar_decode = comfy.utils.ProgressBar(num_frames_to_decode * batch_size)
+
+        with manage_cudnn_benchmark(cudnn_benchmark_to_use, synthesis_device):
+            s_r_dev = s_r_latent.to(synthesis_device)
+            s_r_feats_dev_list = [feat.to(synthesis_device) for feat in s_r_feats_dict["value"]]
+            r_d_dev = r_d_latents.to(synthesis_device)
+
+            decoded_image_sequences_list = []
+            float_synthesis.eval()
+
+            if batch_size > 1:
+                logger.info(f"Applying Synthesis for batch {batch_size}, {num_frames_to_decode} frames each.")
+
+            for b_idx in range(batch_size):
+                s_r_item = s_r_dev[b_idx].unsqueeze(0)
+                s_r_feats_item_list = [feat[b_idx].unsqueeze(0) for feat in s_r_feats_dev_list]
+                r_d_item_all_frames = r_d_dev[b_idx]  # (T, DimW)
+
+                frames_for_this_item = []
+                for t in range(num_frames_to_decode):
+                    current_r_d_frame = r_d_item_all_frames[t].unsqueeze(0)  # (1, DimW)
+                    wa_for_frame_t = s_r_item + current_r_d_frame           # (1, DimW)
+
+                    with torch.no_grad():
+                        img_t_gpu, _flow_info = float_synthesis(wa=wa_for_frame_t, alpha=None, feats=s_r_feats_item_list)
+
+                    img_t_squeezed_gpu = img_t_gpu.squeeze(0)
+                    img_t_processed = img_t_squeezed_gpu.permute(1, 2, 0)
+                    img_t_processed = img_t_processed.clamp(-1, 1)
+                    img_t_processed = ((img_t_processed + 1) / 2)
+                    frames_for_this_item.append(img_t_processed.cpu())
+                    comfy_pbar_decode.update(1)
+
+                if frames_for_this_item:
+                    decoded_image_sequences_list.append(torch.stack(frames_for_this_item, dim=0))
+
+            if not decoded_image_sequences_list:
+                final_images_output_cpu = torch.empty((0, output_img_size, output_img_size, output_img_nc),
+                                                      dtype=torch.float32, device='cpu')
+            else:
+                final_images_output_cpu = torch.cat(decoded_image_sequences_list, dim=0)
+
+            return (final_images_output_cpu, float_synthesis)
+
+
+# TODO: Merge with non-VA version
+class FloatGetIdentityReferenceVA:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "r_s_lambda_latent": ("TORCH_TENSOR",),         # (B, inferred_motion_dim)
+                "float_synthesis": ("FLOAT_SYNTHESIS_MODEL",),  # Loaded Synthesis module
+            }
+        }
+
+    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_SYNTHESIS_MODEL")
+    RETURN_NAMES = ("r_s_latent", "float_synthesis_out")
+    FUNCTION = "get_identity_reference_batch"
+    CATEGORY = BASE_CATEGORY
+    DESCRIPTION = "Derives the batched identity reference latent (r_s) from r_s_lambda."
+    UNIQUE_NAME = "FloatGetIdentityReferenceVA"
+    DISPLAY_NAME = "FLOAT Get Identity Reference"
+
+    def get_identity_reference_batch(self, r_s_lambda_latent: torch.Tensor, float_synthesis: FloatSynthesisModule):
+        synthesis_module = float_synthesis
+        synthesis_device = next(synthesis_module.parameters()).device
+
+        # --- Input Validation ---
+        if not isinstance(r_s_lambda_latent, torch.Tensor):
+            raise TypeError(f"Input 'r_s_lambda_latent' must be a torch.Tensor, "
+                            f"got {type(r_s_lambda_latent)}")
+        # r_s_lambda is (B, dim_m), so 2D
+        if r_s_lambda_latent.ndim != 2:
+            raise ValueError(f"Input 'r_s_lambda_latent' must be a 2D tensor (Batch, DimM), "
+                             f"got {r_s_lambda_latent.ndim}D.")
+        if r_s_lambda_latent.shape[1] != synthesis_module.inferred_motion_dim:
+            raise ValueError(f"Dimension 1 of 'r_s_lambda_latent' should be ({synthesis_module.inferred_motion_dim}), "
+                             f"got {r_s_lambda_latent.shape[1]}.")
+
+        with manage_cudnn_benchmark(synthesis_module.cudnn_benchmark_setting, synthesis_device):
+            try:
+                synthesis_module.to(synthesis_device)
+                r_s_lambda_dev = r_s_lambda_latent.to(synthesis_device)
+
+                # --- Core Operation ---
+                # synthesis_module.direction() should handle a batch input for r_s_lambda.
+                # If r_s_lambda_dev is (B, dim_m), then r_s_latent should be (B, style_dim)
+                # where style_dim is derived from the weights of the Direction layer (512 in original code).
+                synthesis_module.eval()  # Ensure eval mode
+                with torch.no_grad():
+                    r_s_latent_batch_gpu = synthesis_module.direction(r_s_lambda_dev)
+
+                r_s_latent_batch_cpu = r_s_latent_batch_gpu.cpu()
+
+                return (r_s_latent_batch_cpu, synthesis_module)
+
+            finally:
+                # Offload after use if it's not the CPU (standard ComfyUI practice for GPU models)
+                if synthesis_device.type != 'cpu':
+                    synthesis_module.to(mm.unet_offload_device())

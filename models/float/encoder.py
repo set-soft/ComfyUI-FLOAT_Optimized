@@ -7,6 +7,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from tqdm.auto import tqdm
+from ..misc import CHANNELS_MAP
 
 
 def fused_leaky_relu(input, bias, negative_slope=0.2, scale=2 ** 0.5):
@@ -202,27 +203,15 @@ class EncoderApp(nn.Module):
     def __init__(self, size, w_dim=512):
         super(EncoderApp, self).__init__()
 
-        channels = {
-            4: 512,
-            8: 512,
-            16: 512,
-            32: 512,
-            64: 256,
-            128: 128,
-            256: 64,
-            512: 32,
-            1024: 16
-        }
-
         self.w_dim = w_dim
         log_size = int(math.log(size, 2))
 
         self.convs = nn.ModuleList()
-        self.convs.append(ConvLayer(3, channels[size], 1))
+        self.convs.append(ConvLayer(3, CHANNELS_MAP[size], 1))
 
-        in_channel = channels[size]
+        in_channel = CHANNELS_MAP[size]
         for i in range(log_size, 2, -1):
-            out_channel = channels[2 ** (i - 1)]
+            out_channel = CHANNELS_MAP[2 ** (i - 1)]
             self.convs.append(ResBlock(in_channel, out_channel))
             in_channel = out_channel
 
