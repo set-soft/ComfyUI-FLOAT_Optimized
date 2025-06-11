@@ -23,6 +23,7 @@ from .utils.image import img_tensor_2_np_array, process_img
 from .utils.torch import manage_cudnn_benchmark
 from .utils.misc import EMOTIONS, NODES_NAME
 from .generate import InferenceAgent
+from .models.float.FMT import FlowMatchingTransformer
 
 BASE_CATEGORY = "FLOAT/Advanced"
 # List of fixed-step solvers you from torchdiffeq
@@ -512,6 +513,133 @@ class FloatEncodeEmotionToLatentWE:
                 agent.G.emotion_encoder.to(mm.unet_offload_device())
 
 
+# This helper function encapsulates the core ODE sampling loop
+def _perform_ode_sampling_loop(
+        fmt_model: FlowMatchingTransformer,  # The actual FMT model instance
+        r_s_latent_dev: torch.Tensor,        # Shape: (B, DimW), on target device
+        wa_latent_dev: torch.Tensor,         # Shape: (B, TotalAudioFrames, DimW), on target device
+        we_latent_dev: torch.Tensor,         # Shape: (B, 1, NumEmotionClasses), on target device
+        audio_num_frames: int,               # Total number of frames for the output sequence T
+
+        # Parameters derived from the FMT model's configuration (or agent.G)
+        model_num_prev_frames: int,
+        model_num_frames_for_clip: int,
+        model_dim_w: int,                # Dimension of motion latents (opt.dim_w)
+
+        # ODE solver parameters
+        ode_nfe: int,
+        ode_method: str,
+        ode_atol: float,
+        ode_rtol: float,
+        target_device: torch.device,     # Device for computations (opt.rank)
+
+        # Classifier-Free Guidance scales
+        a_cfg_scale: float,
+        r_cfg_scale: float,
+        e_cfg_scale: float,
+
+        # Noise generation parameters
+        noise_seed_generator: torch.Generator,  # Pre-configured torch.Generator or None
+
+        # Misc
+        cudnn_benchmark_enabled: bool) -> torch.Tensor:
+    """
+    Performs the core ODE-based sampling loop for generating r_d latents.
+    Returns r_d_latents on the target_device.
+    """
+
+    batch_size = wa_latent_dev.shape[0]
+
+    current_odeint_kwargs = {
+        'atol': ode_atol,
+        'rtol': ode_rtol,
+        'method': ode_method
+    }
+    time_linspace = torch.linspace(0, 1, ode_nfe, device=target_device)
+
+    sampled_chunks_list = []
+    # Initialize prev_x_batch and prev_wa_batch for the first chunk
+    prev_x_batch = torch.zeros(batch_size, model_num_prev_frames, model_dim_w, device=target_device)
+    prev_wa_batch = torch.zeros(batch_size, model_num_prev_frames, model_dim_w, device=target_device)
+
+    total_num_chunks = math.ceil(audio_num_frames / model_num_frames_for_clip)
+    # The ProgressBar should ideally be managed by the calling node,
+    # but for direct reuse, we can pass a total and update function or instantiate here.
+    # For now, let's use comfy.utils.ProgressBar directly as in the original.
+    comfy_pbar = comfy.utils.ProgressBar(total_num_chunks)
+    # logger.info(f"ODE sampling loop: {batch_size} item(s), {total_num_chunks} chunks.") # Logging can be done by caller
+
+    with manage_cudnn_benchmark(cudnn_benchmark_enabled, target_device):  # Pass device to CUDNN manager
+        # fmt_model is assumed to be already on target_device by the caller
+        fmt_model.eval()  # Ensure eval mode
+
+        for chunk_idx in range(total_num_chunks):
+            x0_chunk_batch = torch.randn(batch_size, model_num_frames_for_clip, model_dim_w,
+                                         device=target_device, generator=noise_seed_generator)
+
+            start_idx = chunk_idx * model_num_frames_for_clip
+            end_idx = (chunk_idx + 1) * model_num_frames_for_clip
+            wa_chunk_batch = wa_latent_dev[:, start_idx:end_idx, :]
+
+            current_chunk_len = wa_chunk_batch.shape[1]
+            if current_chunk_len < model_num_frames_for_clip:
+                padding_size = model_num_frames_for_clip - current_chunk_len
+                wa_chunk_batch = F.pad(wa_chunk_batch, (0, 0, 0, padding_size), mode='replicate')
+
+            def fmt_ode_func_batch(t_scalar, current_x_batch):
+                # Ensure t_scalar is correctly shaped for fmt.forward_with_cfv
+                # (which expects a scalar or a (B,) tensor for its 't' arg, then unsqueezes)
+                t_for_fmt = t_scalar
+                if t_scalar.ndim == 0:  # If scalar
+                    t_for_fmt = t_scalar.unsqueeze(0)
+                elif t_scalar.ndim == 1 and t_scalar.shape[0] == 1:  # If (1,)
+                    pass  # Already fine
+                else:
+                    # This case should generally not be hit by torchdiffeq.odeint with fixed steps
+                    raise ValueError(f"Unexpected time tensor shape from odeint: {t_scalar.shape}")
+
+                output_combined_batch = fmt_model.forward_with_cfv(
+                    t=t_for_fmt,
+                    x=current_x_batch,
+                    wa=wa_chunk_batch,
+                    wr=r_s_latent_dev,
+                    we=we_latent_dev,
+                    prev_x=prev_x_batch,
+                    prev_wa=prev_wa_batch,
+                    a_cfg_scale=a_cfg_scale,
+                    r_cfg_scale=r_cfg_scale,
+                    e_cfg_scale=e_cfg_scale
+                )
+                # fmt.forward_with_cfv returns combined (prev+current), so slice:
+                return output_combined_batch[:, model_num_prev_frames:, :]
+
+            trajectory_batch = odeint(fmt_ode_func_batch, x0_chunk_batch, time_linspace, **current_odeint_kwargs)
+            current_sample_output_batch = trajectory_batch[-1]
+            sampled_chunks_list.append(current_sample_output_batch)
+
+            # Update prev_x_batch and prev_wa_batch for the next iteration
+            if current_sample_output_batch.shape[1] >= model_num_prev_frames:
+                prev_x_batch = current_sample_output_batch[:, -model_num_prev_frames:, :]
+            else:  # Should not happen if model_num_prev_frames <= model_num_frames_for_clip
+                prev_x_batch = F.pad(current_sample_output_batch, (0, 0, 0, model_num_prev_frames -
+                                     current_sample_output_batch.shape[1]),
+                                     mode='replicate')[:, -model_num_prev_frames:, :]
+
+            if wa_chunk_batch.shape[1] >= model_num_prev_frames:
+                prev_wa_batch = wa_chunk_batch[:, -model_num_prev_frames:, :]
+            else:  # Should not happen
+                prev_wa_batch = F.pad(wa_chunk_batch, (0, 0, 0, model_num_prev_frames - wa_chunk_batch.shape[1]),
+                                      mode='replicate')[:, -model_num_prev_frames:, :]
+
+            comfy_pbar.update(1)  # Update progress bar
+
+    r_d_latents_full_gpu = torch.cat(sampled_chunks_list, dim=1)
+    # Trim to the exact audio_num_frames length
+    r_d_latents_gpu = r_d_latents_full_gpu[:, :audio_num_frames, :]
+
+    return r_d_latents_gpu  # Return on target_device, caller handles .cpu()
+
+
 class FloatSampleMotionSequenceRD:
     @classmethod
     def INPUT_TYPES(cls):
@@ -561,111 +689,84 @@ class FloatSampleMotionSequenceRD:
             # and slices/pads wa_latent_dev based on chunk_idx.
             # Final trimming is to audio_num_frames. This should be robust.
 
-        # --- Use ODE parameters from agent.opt ---
-        nfe_to_use = opt.nfe
-        ode_method_to_use = opt.torchdiffeq_ode_method
-        ode_atol_to_use = opt.ode_atol
-        ode_rtol_to_use = opt.ode_rtol
-        # r_cfg_scale is also from opt
-        r_cfg_scale_to_use = opt.r_cfg_scale
+        # --- Prepare parameters for the helper function ---
+        fmt_model_to_use = agent.G.fmt
 
-        logger.info(f"Using ODE params from pipe: NFE={nfe_to_use}, Method={ode_method_to_use}, "
-                    f"ATOL={ode_atol_to_use}, RTOL={ode_rtol_to_use}. R_CFG={r_cfg_scale_to_use}")
-
-        current_odeint_kwargs = {
-            'atol': ode_atol_to_use,
-            'rtol': ode_rtol_to_use,
-            'method': ode_method_to_use
-        }
-        time_linspace = torch.linspace(0, 1, nfe_to_use, device=opt.rank)
-
-        if opt.fix_noise_seed:
-            g = torch.Generator(opt.rank)
-            final_seed = opt.seed if seed == -1 else seed
-            g.manual_seed(final_seed)
-            logger.debug(f"Using fixed seed: {final_seed} for ODE sampling.")
-        else:
-            g = None
-            logger.debug("Not using a seed for ODE sampling.")
-
-        sampled_chunks_list = []
-        prev_x_batch = torch.zeros(batch_size, opt.num_prev_frames, opt.dim_w, device=opt.rank)
-        prev_wa_batch = torch.zeros(batch_size, opt.num_prev_frames, opt.dim_w, device=opt.rank)
-
+        # Get parameters from agent.G (model's fixed config) and agent.opt (runtime/ODE settings)
         model_num_prev_frames = agent.G.num_prev_frames
         model_num_frames_for_clip = agent.G.num_frames_for_clip
-        total_num_chunks = math.ceil(audio_num_frames / model_num_frames_for_clip)
-        comfy_pbar = comfy.utils.ProgressBar(total_num_chunks)
-        logger.info(f"Starting ODE sampling for {batch_size} item(s) over {total_num_chunks} chunks.")
+        model_dim_w = opt.dim_w  # Dimension of the motion latents
 
-        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
-            try:
-                agent.G.fmt.to(opt.rank)
-                r_s_latent_dev = r_s_latent.to(opt.rank)
-                we_latent_dev = we_latent.to(opt.rank)
-                wa_latent_dev = wa_latent.to(opt.rank)
+        ode_nfe = opt.nfe
+        ode_method = opt.torchdiffeq_ode_method
+        ode_atol = opt.ode_atol
+        ode_rtol = opt.ode_rtol
+        target_device_for_sampling = opt.rank
 
-                for chunk_idx in range(total_num_chunks):
-                    x0_chunk_batch = torch.randn(batch_size, model_num_frames_for_clip, opt.dim_w,
-                                                 device=opt.rank, generator=g)
+        r_cfg_scale_from_opt = opt.r_cfg_scale
 
-                    start_idx = chunk_idx * model_num_frames_for_clip
-                    end_idx = (chunk_idx + 1) * model_num_frames_for_clip
-                    wa_chunk_batch = wa_latent_dev[:, start_idx:end_idx, :]
+        # Handle noise generator
+        noise_gen = None
+        if opt.fix_noise_seed:
+            noise_gen = torch.Generator(opt.rank)
+            # Your original code used seed == -1 to indicate using opt.seed
+            # If seed is -1 from UI, use opt.seed, otherwise use the provided seed.
+            final_seed_value = opt.seed if seed == -1 else seed
+            noise_gen.manual_seed(final_seed_value)
+            logger.debug(f"Using fixed seed: {final_seed_value} for ODE sampling.")
+        else:
+            # If not fixing noise via opt.fix_noise_seed, but a seed is provided, use it.
+            # If g is None for torch.randn, it uses global RNG.
+            # To make `seed` input always effective if fix_noise_seed is False,
+            # we can still create a generator. Or pass None to use global.
+            # For consistency, let's always use a generator if a seed is given,
+            # or None if we want truly random.
+            # Your original code sets g=None if opt.fix_noise_seed is False.
+            # Let's stick to that behavior for noise_seed_generator.
+            if seed != -1:  # If a specific seed is given, and not the "use opt.seed" signal
+                noise_gen = torch.Generator(opt.rank)
+                noise_gen.manual_seed(seed)
+                logger.debug(f"Using provided seed: {seed} for ODE sampling (fix_noise_seed is False).")
+            else:
+                logger.debug("Not using a fixed seed (opt.fix_noise_seed is False and seed is -1). "
+                             "Global RNG will be used by randn if generator is None.")
+                # torch.randn with generator=None uses global RNG.
 
-                    current_chunk_len = wa_chunk_batch.shape[1]
-                    if current_chunk_len < model_num_frames_for_clip:
-                        padding_size = model_num_frames_for_clip - current_chunk_len
-                        wa_chunk_batch = F.pad(wa_chunk_batch, (0, 0, 0, padding_size), mode='replicate')
+        # Ensure FMT model is on the correct device before calling helper
+        fmt_model_to_use.to(target_device_for_sampling)
+        # Ensure input latents are on the correct device
+        r_s_latent_dev = r_s_latent.to(target_device_for_sampling)
+        wa_latent_dev = wa_latent.to(target_device_for_sampling)
+        we_latent_dev = we_latent.to(target_device_for_sampling)
 
-                    def fmt_ode_func_batch(t_scalar, current_x_batch):
-                        t_for_fmt = t_scalar.unsqueeze(0)
-                        if t_scalar.ndim == 1 and t_scalar.shape[0] == 1:
-                            t_for_fmt = t_scalar
-                        elif t_scalar.ndim > 0:
-                            raise ValueError(f"Unexpected time tensor shape from odeint: {t_scalar.shape}")
+        logger.info(f"Calling ODE sampling loop for {batch_size} item(s).")
+        try:
+            r_d_latents_gpu = _perform_ode_sampling_loop(
+                fmt_model=fmt_model_to_use,
+                r_s_latent_dev=r_s_latent_dev,
+                wa_latent_dev=wa_latent_dev,
+                we_latent_dev=we_latent_dev,
+                audio_num_frames=audio_num_frames,
+                model_num_prev_frames=model_num_prev_frames,
+                model_num_frames_for_clip=model_num_frames_for_clip,
+                model_dim_w=model_dim_w,
+                ode_nfe=ode_nfe,
+                ode_method=ode_method,
+                ode_atol=ode_atol,
+                ode_rtol=ode_rtol,
+                target_device=target_device_for_sampling,
+                a_cfg_scale=a_cfg_scale,
+                r_cfg_scale=r_cfg_scale_from_opt,  # Using value from opt
+                e_cfg_scale=e_cfg_scale,
+                noise_seed_generator=noise_gen,
+                cudnn_benchmark_enabled=opt.cudnn_benchmark_enabled  # Pass this for the helper's context manager
+            )
+            r_d_latents_cpu = r_d_latents_gpu.cpu()
 
-                        output_combined_batch = agent.G.fmt.forward_with_cfv(
-                            t=t_for_fmt,
-                            x=current_x_batch,
-                            wa=wa_chunk_batch,
-                            wr=r_s_latent_dev,
-                            we=we_latent_dev,
-                            prev_x=prev_x_batch,
-                            prev_wa=prev_wa_batch,
-                            a_cfg_scale=a_cfg_scale,
-                            r_cfg_scale=r_cfg_scale_to_use,  # Using value from opt
-                            e_cfg_scale=e_cfg_scale
-                        )
-                        return output_combined_batch[:, model_num_prev_frames:, :]
+            return (r_d_latents_cpu, float_pipe)
 
-                    trajectory_batch = odeint(fmt_ode_func_batch, x0_chunk_batch, time_linspace, **current_odeint_kwargs)
-                    current_sample_output_batch = trajectory_batch[-1]
-                    sampled_chunks_list.append(current_sample_output_batch)
-
-                    if current_sample_output_batch.shape[1] >= model_num_prev_frames:
-                        prev_x_batch = current_sample_output_batch[:, -model_num_prev_frames:, :]
-                    else:
-                        prev_x_batch = F.pad(current_sample_output_batch, (0, 0, 0, model_num_prev_frames -
-                                             current_sample_output_batch.shape[1]),
-                                             mode='replicate')[:, -model_num_prev_frames:, :]
-
-                    if wa_chunk_batch.shape[1] >= model_num_prev_frames:
-                        prev_wa_batch = wa_chunk_batch[:, -model_num_prev_frames:, :]
-                    else:
-                        prev_wa_batch = F.pad(wa_chunk_batch, (0, 0, 0, model_num_prev_frames - wa_chunk_batch.shape[1]),
-                                              mode='replicate')[:, -model_num_prev_frames:, :]
-
-                    comfy_pbar.update(1)
-
-                r_d_latents_full_gpu = torch.cat(sampled_chunks_list, dim=1)
-                r_d_latents_gpu = r_d_latents_full_gpu[:, :audio_num_frames, :]
-                r_d_latents_cpu = r_d_latents_gpu.cpu()
-
-                return (r_d_latents_cpu, float_pipe)
-
-            finally:
-                agent.G.fmt.to(mm.unet_offload_device())
+        finally:
+            agent.G.fmt.to(mm.unet_offload_device())
 
 
 class FloatDecodeLatentsToImages:
