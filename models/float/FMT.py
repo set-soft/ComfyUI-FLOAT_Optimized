@@ -245,6 +245,7 @@ class FlowMatchingTransformer(BaseModel):
 
         self.apply(_basic_init)
 
+        # Always sinusoidal, the FLOAT checkpoints has this, is not changed
         pos_embed = get_sinusoid_encoding_table(self.num_total_frames, self.hidden_size)
         self.pos_embed.data.copy_(pos_embed.unsqueeze(0))
 
