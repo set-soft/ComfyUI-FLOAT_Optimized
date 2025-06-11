@@ -3,9 +3,11 @@
 # Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
+from collections import OrderedDict
 import logging
 import math
 import os
+import re
 import torch
 import torch.nn.functional as F
 # from tqdm import tqdm
@@ -21,11 +23,13 @@ from .utils.torch import get_torch_device_options, manage_cudnn_benchmark
 from .utils.misc import EMOTIONS, NODES_NAME
 from .models.float.encoder import Encoder as FloatEncoderModule
 from .models.float.styledecoder import Synthesis as FloatSynthesisModule
+from .models.float.FMT import FlowMatchingTransformer
 from .models.misc import CHANNELS_MAP
 
 logger = logging.getLogger(f"{NODES_NAME}.nodes_vadv")
 PROJECTIONS_DIR = "float/audio_projections"
 MOTION_AE_DIR = "float/motion_autoencoder"
+FMT_SUBDIR = "float/fmt"
 BASE_CATEGORY = "FLOAT/Very Advanced"
 ESPR = "wav2vec-english-speech-emotion-recognition"
 SUFFIX = "(VA)"
@@ -301,7 +305,7 @@ class LoadAudioProjectionLayer:
 
     RETURN_TYPES = ("AUDIO_PROJECTION_LAYER",  # Custom type for the nn.Module
                     "INT", "INT")
-    RETURN_NAMES = ("projection_layer", "inferred_input_dim", "inferred_output_dim_w")
+    RETURN_NAMES = ("projection_layer", "inferred_input_dim", "dim_a")
     FUNCTION = "load_projection_layer"
     CATEGORY = BASE_CATEGORY + "/Loaders"
 
@@ -343,16 +347,16 @@ class LoadAudioProjectionLayer:
             raise ValueError(f"Weight tensor '{linear_weight_key}' is not 2D (shape: {linear_weight_tensor.shape}). "
                              "Expected (out_features, in_features).")
 
-        inferred_output_dim_w = linear_weight_tensor.shape[0]  # out_features
+        dim_a = linear_weight_tensor.shape[0]  # out_features
         inferred_input_feature_dim = linear_weight_tensor.shape[1]  # in_features
 
         main_logger.info(f"Inferred projection layer dimensions: Input={inferred_input_feature_dim}, "
-                         f"Output={inferred_output_dim_w}")
+                         f"Output={dim_a}")
 
         # Define the projection layer structure (matching original AudioEncoder's projection)
         projection_layer = torch.nn.Sequential(
-            torch.nn.Linear(inferred_input_feature_dim, inferred_output_dim_w),
-            torch.nn.LayerNorm(inferred_output_dim_w),
+            torch.nn.Linear(inferred_input_feature_dim, dim_a),
+            torch.nn.LayerNorm(dim_a),
             torch.nn.SiLU()
         )
 
@@ -372,7 +376,7 @@ class LoadAudioProjectionLayer:
         projection_layer.eval()
         main_logger.info(f"Audio projection layer loaded to {target_device} and set to eval mode.")
 
-        return (projection_layer, inferred_input_feature_dim, inferred_output_dim_w)
+        return (projection_layer, inferred_input_feature_dim, dim_a)
 
 
 class FloatApplyAudioProjection:
@@ -455,8 +459,8 @@ class LoadEmotionRecognitionModel:
             }
         }
 
-    RETURN_TYPES = ("EMOTION_MODEL_PIPE",)
-    RETURN_NAMES = ("emotion_model_pipe",)
+    RETURN_TYPES = ("EMOTION_MODEL_PIPE", "INT")
+    RETURN_NAMES = ("emotion_model_pipe", "dim_e")  # Dimension for the emotions, i.e. 7 emotions
     FUNCTION = "load_emotion_model"
     CATEGORY = BASE_CATEGORY + "/Loaders"
 
@@ -487,6 +491,12 @@ class LoadEmotionRecognitionModel:
             emotion_model.to(device)
             emotion_model.eval()
 
+            # We need to know how many emotions are available
+            if not hasattr(config, "num_labels"):
+                msg = "Missing `num_labels` in emotion recognition config"
+                logger.error(msg)
+                raise ValueError(msg)
+
             # Store relevant config info, especially label mappings if available
             model_config_dict = {
                 "num_labels": config.num_labels,
@@ -497,11 +507,9 @@ class LoadEmotionRecognitionModel:
             }
 
             # emotion_model_pipe tuple: (model, feature_extractor, model_config_dict)
-            return ((emotion_model, feature_extractor, model_config_dict),)
+            return ((emotion_model, feature_extractor, model_config_dict), config.num_labels)
         except Exception as e:
             logger.error(f"Error loading Emotion Recognition model from {model_path}: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
             raise
 
 
@@ -643,7 +651,7 @@ class LoadFloatEncoderModel:
 
     # Outputting inferred dimensions for user information / optional wiring
     RETURN_TYPES = ("FLOAT_ENCODER_MODEL", "INT", "INT", "INT")
-    RETURN_NAMES = ("float_encoder", "inferred_input_size", "inferred_style_dim_w", "inferred_motion_dim_m")
+    RETURN_NAMES = ("float_encoder", "inferred_input_size", "dim_w", "dim_m")
     FUNCTION = "load_encoder_infer_arch"
 
     def load_encoder_infer_arch(self, encoder_file: str, target_device: str, cudnn_benchmark: bool):
@@ -668,21 +676,21 @@ class LoadFloatEncoderModel:
             raise
 
         inferred_input_size = None
-        inferred_style_dim_w = None
-        inferred_motion_dim_m = None
+        dim_w = None
+        dim_m = None
 
         try:
             # Infer motion_dim_m
             motion_dim_key = 'fc.4.weight'
             if motion_dim_key not in loaded_sd:
                 raise KeyError(f"Key '{motion_dim_key}' not found for motion_dim inference.")
-            inferred_motion_dim_m = loaded_sd[motion_dim_key].shape[0]
+            dim_m = loaded_sd[motion_dim_key].shape[0]
 
             # Infer style_dim_w
             style_dim_key = 'fc.0.weight'
             if style_dim_key not in loaded_sd:
                 raise KeyError(f"Key '{style_dim_key}' not found for style_dim_w inference.")
-            inferred_style_dim_w = loaded_sd[style_dim_key].shape[0]
+            dim_w = loaded_sd[style_dim_key].shape[0]
 
             # Infer input_size
             first_conv_key_primary = 'net_app.convs.0.0.weight'
@@ -702,7 +710,7 @@ class LoadFloatEncoderModel:
             inferred_input_size = self.INV_CHANNELS_MAP[out_channels_first_conv]
 
             logger.info(f"Inferred Encoder Arch: size={inferred_input_size}, "
-                        f"style_dim_w={inferred_style_dim_w}, motion_dim_m={inferred_motion_dim_m}")
+                        f"style_dim_w={dim_w}, motion_dim_m={dim_m}")
         except KeyError as e:
             logger.error(f"Could not infer arch from weights: {e}. Check file structure.")
             raise
@@ -710,8 +718,8 @@ class LoadFloatEncoderModel:
             logger.error(f"Error during arch inference: {e}")
             raise
 
-        encoder_model = FloatEncoderModule(size=inferred_input_size, dim=inferred_style_dim_w,
-                                           dim_motion=inferred_motion_dim_m)
+        encoder_model = FloatEncoderModule(size=inferred_input_size, dim=dim_w,
+                                           dim_motion=dim_m)
 
         try:
             m, u = encoder_model.load_state_dict(loaded_sd, strict=True)
@@ -725,8 +733,8 @@ class LoadFloatEncoderModel:
 
         # Store inferred and provided relevant parameters on the instance
         encoder_model.inferred_input_size = inferred_input_size
-        encoder_model.inferred_style_dim_w = inferred_style_dim_w
-        encoder_model.inferred_motion_dim_m = inferred_motion_dim_m
+        encoder_model.dim_w = dim_w
+        encoder_model.dim_m = dim_m
         encoder_model.cudnn_benchmark_setting = cudnn_benchmark  # Store this setting
 
         device = torch.device(target_device)
@@ -734,7 +742,7 @@ class LoadFloatEncoderModel:
         encoder_model.eval()
         logger.info(f"FLOAT Encoder (inferred arch) loaded to {target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
 
-        return (encoder_model, inferred_input_size, inferred_style_dim_w, inferred_motion_dim_m)
+        return (encoder_model, inferred_input_size, dim_w, dim_m)
 
 
 class ApplyFloatEncoder:
@@ -1148,3 +1156,241 @@ class FloatGetIdentityReferenceVA:
                 # Offload after use if it's not the CPU (standard ComfyUI practice for GPU models)
                 if synthesis_device.type != 'cpu':
                     synthesis_module.to(mm.unet_offload_device())
+
+
+class LoadFMTModel:
+    UNIQUE_NAME = "LoadFMTModel"
+    DISPLAY_NAME = "Load FLOAT FMT Model"
+    DEFAULT_FMT_FILENAME = "fmt.safetensors"
+    CATEGORY = BASE_CATEGORY + "/Loaders"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        fmt_weights_path = os.path.join(folder_paths.models_dir, FMT_SUBDIR)
+        if not os.path.isdir(fmt_weights_path):
+            try:
+                os.makedirs(fmt_weights_path, exist_ok=True)
+            except OSError:
+                pass
+
+        weight_files = [cls.DEFAULT_FMT_FILENAME]
+        found_default = False
+        other_files_temp = []
+        if os.path.isdir(fmt_weights_path):
+            for f in os.listdir(fmt_weights_path):
+                if f.endswith(".safetensors"):
+                    if f == cls.DEFAULT_FMT_FILENAME:
+                        found_default = True
+                    else:
+                        other_files_temp.append(f)
+        if found_default:
+            weight_files.extend(sorted(other_files_temp))
+        elif other_files_temp:
+            weight_files = sorted(other_files_temp)
+        else:
+            weight_files = ["No FMT files found"]
+        if not weight_files:  # Should be redundant due to above logic
+            weight_files = ["No FMT files found"]
+
+        device_options = get_torch_device_options()
+        default_device = "cuda" if "cuda" in device_options else "cpu"
+
+        # Defaults for user inputs from BaseOptions
+        base_opts = BaseOptions()
+
+        return {
+            "required": {
+                "fmt_file": (weight_files,),
+                "target_device": (device_options, {"default": default_device}),
+                "cudnn_benchmark": ("BOOLEAN", {"default": False}),
+                "dim_e": ("INT", {"default": base_opts.dim_e, "min": 1, "max": 100}),
+                "num_heads": ("INT", {"default": base_opts.num_heads, "min": 1, "max": 32}),
+                "attention_window": ("INT", {"default": base_opts.attention_window, "min": 1, "max": 20}),
+                "num_prev_frames": ("INT", {"default": base_opts.num_prev_frames, "min": 0, "max": 100}),
+                "fps": ("FLOAT", {"default": base_opts.fps, "min": 1.0, "max": 120.0, "step": 0.1}),
+                "wav2vec_sec": ("FLOAT", {"default": base_opts.wav2vec_sec, "min": 0.1, "max": 10.0, "step": 0.1}),
+            },
+            "optional": {
+                # This is now primarily for any *other* BaseOptions overrides the user might want,
+                # not for the critical structural ones listed above.
+                "advanced_float_options": ("ADV_FLOAT_DICT", {"default": {}})
+            }
+        }
+
+    # Outputting key inferred and used parameters
+    RETURN_TYPES = ("FLOAT_FMT_MODEL", "ADV_FLOAT_DICT")
+    RETURN_NAMES = ("float_fmt_model", "fmt_options_out")
+    FUNCTION = "load_fmt_model"
+
+    def load_fmt_model(self, fmt_file: str, target_device: str, cudnn_benchmark: bool,
+                       dim_e: int, num_heads: int, attention_window: int,
+                       num_prev_frames: int, fps: float, wav2vec_sec: float,
+                       advanced_float_options: dict = None):
+
+        if fmt_file == "No FMT files found":
+            raise FileNotFoundError(f"No FMT .safetensors files found in 'models/{FMT_SUBDIR}/'.")
+
+        weights_path = os.path.join(folder_paths.models_dir, FMT_SUBDIR, fmt_file)
+        if not os.path.exists(weights_path):
+            raise FileNotFoundError(f"FMT weights file not found: {weights_path}")
+
+        logger.info(f"Loading FMT state_dict from {weights_path} to CPU for inference and validation.")
+        try:
+            cpu_device = torch.device("cpu")
+            if hasattr(comfy.utils, 'load_torch_file'):
+                loaded_sd = comfy.utils.load_torch_file(weights_path, safe_load=True, device=cpu_device)
+            else:
+                from safetensors.torch import load_file
+                loaded_sd = load_file(weights_path, device="cpu")
+        except Exception as e:
+            logger.error(f"Error loading FMT weights file: {e}")
+            raise
+
+        # --- 1. Infer structural parameters from loaded_sd ---
+        try:
+            inferred_dim_h = loaded_sd['x_embedder.proj.weight'].shape[0]
+            logger.debug(f"Found dim_h: {inferred_dim_h}")
+            inferred_dim_w_for_x_embedder = loaded_sd['x_embedder.proj.weight'].shape[1]
+            logger.debug(f"Found dim_w: {inferred_dim_w_for_x_embedder}")
+
+            max_block_idx = -1
+            r = re.compile(r".*blocks\.(\d+)\..*")
+            for k in loaded_sd.keys():
+                m = r.match(k)
+                if m:
+                    block_idx = int(m.group(1))
+                    if block_idx > max_block_idx:
+                        max_block_idx = block_idx
+            if max_block_idx == -1:
+                raise KeyError("Could not find FMT blocks to infer fmt_depth.")
+            inferred_fmt_depth = max_block_idx + 1
+            logger.debug(f"Found fmt_depth: {inferred_fmt_depth}")
+
+            # MLP ratio: mlp_hidden_dim / hidden_size. mlp_hidden_dim is fc1.out_features.
+            mlp_fc1_weight_shape = loaded_sd['blocks.0.mlp.fc1.weight'].shape
+            inferred_mlp_ratio = mlp_fc1_weight_shape[0] / inferred_dim_h
+            logger.debug(f"Found mlp_ratio: {inferred_mlp_ratio}")
+
+            # Infer sum of (dim_w + dim_a + dim_e) for c_embedder
+            c_embedder_total_input_dim = loaded_sd['c_embedder.weight'].shape[1]
+            # Calculate inferred_dim_a
+            inferred_dim_a = c_embedder_total_input_dim - inferred_dim_w_for_x_embedder - dim_e  # User provides dim_e
+            logger.debug(f"Found dim_a: {inferred_dim_a}")
+            if inferred_dim_a <= 0:
+                raise ValueError(f"Inferred dim_a ({inferred_dim_a}) is not positive. Check c_embedder weights, "
+                                 f"inferred_dim_w_for_x_embedder ({inferred_dim_w_for_x_embedder}), or dim_e ({dim_e}).")
+
+            logger.info(f"Inferred FMT Params: dim_h={inferred_dim_h}, dim_w={inferred_dim_w_for_x_embedder}, "
+                        f"fmt_depth={inferred_fmt_depth}, mlp_ratio={inferred_mlp_ratio:.2f}, dim_a={inferred_dim_a}")
+        except KeyError as e:
+            logger.error(f"Missing key in FMT state_dict for inference: {e}. File might be corrupt or not an FMT model.")
+            raise
+        except Exception as e:
+            logger.error(f"Error during FMT parameter inference: {e}")
+            raise
+
+        # --- 2. Prepare opt_for_fmt using inferred and input values ---
+        opt_for_fmt = BaseOptions()  # Start with BaseOptions defaults
+
+        # Apply advanced_float_options first for any general overrides
+        current_advanced_options = advanced_float_options if advanced_float_options is not None else {}
+        for key, value in current_advanced_options.items():
+            if hasattr(opt_for_fmt, key):
+                setattr(opt_for_fmt, key, value)
+            else:  # Allow setting attributes not in BaseOptions if user explicitly passes them
+                logger.warning(f"Option '{key}' from advanced_float_options is not in BaseOptions. Setting it on opt_for_fmt.")
+                setattr(opt_for_fmt, key, value)
+
+        # Override with inferred and direct input values (these are authoritative for structure)
+        opt_for_fmt.rank = torch.device(target_device)  # For mask creation device
+        opt_for_fmt.dim_h = inferred_dim_h
+        opt_for_fmt.fmt_depth = inferred_fmt_depth
+        opt_for_fmt.mlp_ratio = inferred_mlp_ratio
+        opt_for_fmt.dim_w = inferred_dim_w_for_x_embedder  # For x_embedder and c_embedder's 'wr' part
+        opt_for_fmt.dim_a = inferred_dim_a
+        opt_for_fmt.dim_e = dim_e
+        opt_for_fmt.num_heads = num_heads
+        opt_for_fmt.attention_window = attention_window
+        opt_for_fmt.num_prev_frames = num_prev_frames
+        opt_for_fmt.fps = fps
+        opt_for_fmt.wav2vec_sec = wav2vec_sec
+        # opt_for_fmt.no_learned_pe is taken from BaseOptions/advanced_float_options,
+        # but as discussed, it doesn't change FMT.py's pos_embed type.
+
+        # --- 3. Validate pos_embed and alignment_mask dimensions against current opt_for_fmt ---
+        # These will be used by FMT.__init__ to size its internal pos_embed and alignment_mask
+        num_frames_for_clip_from_opts = int(opt_for_fmt.wav2vec_sec * opt_for_fmt.fps)
+        num_total_frames_from_opts = opt_for_fmt.num_prev_frames + num_frames_for_clip_from_opts
+
+        if 'pos_embed' in loaded_sd:
+            num_total_frames_from_weights = loaded_sd['pos_embed'].shape[1]
+            hidden_size_from_pos_embed = loaded_sd['pos_embed'].shape[2]
+            if hidden_size_from_pos_embed != opt_for_fmt.dim_h:
+                raise ValueError(f"Saved 'pos_embed' hidden dim ({hidden_size_from_pos_embed}) conflicts with "
+                                 f"inferred/set opt.dim_h ({opt_for_fmt.dim_h}).")
+            if num_total_frames_from_weights != num_total_frames_from_opts:
+                raise ValueError(f"Saved 'pos_embed' is for {num_total_frames_from_weights} total frames. "
+                                 f"Current input options (fps, wav2vec_sec, num_prev_frames) calculate to "
+                                 f"{num_total_frames_from_opts} frames. "
+                                 "These must match. Please adjust node inputs.")
+        else:
+            logger.info("'pos_embed' key not found in checkpoint. FMT will initialize it based on current options.")
+
+        if 'alignment_mask' in loaded_sd:
+            mask_shape_from_weights = loaded_sd['alignment_mask'].shape
+            if (mask_shape_from_weights[0] != num_total_frames_from_opts or
+               mask_shape_from_weights[1] != num_total_frames_from_opts):
+                raise ValueError(f"Saved 'alignment_mask' shape {mask_shape_from_weights} is incompatible with calculated "
+                                 f"num_total_frames {num_total_frames_from_opts} from current input options. Adjust inputs.")
+        else:
+            logger.info("'alignment_mask' key not found in checkpoint. FMT will initialize it based on current options.")
+
+        # --- 4. Instantiate FMT ---
+        logger.info(f"Instantiating FlowMatchingTransformer with finalized options. "
+                    f"Target device for mask: {opt_for_fmt.rank}")
+        # (opt_for_fmt now contains a mix of inferred structural params and user-provided hyperparams)
+        fmt_model = FlowMatchingTransformer(opt=opt_for_fmt)
+
+        # --- 5. Load weights, skipping pos_embed and alignment_mask ---
+        logger.info(f"Loading weights from {weights_path} into FlowMatchingTransformer, skipping 'pos_embed' "
+                    "and 'alignment_mask'.")
+        keys_to_skip_loading = ['pos_embed', 'alignment_mask']
+        final_sd_to_load = OrderedDict()
+        skipped_keys_info = []
+
+        for k, v in loaded_sd.items():
+            if k not in keys_to_skip_loading:
+                final_sd_to_load[k] = v
+            else:
+                skipped_keys_info.append(f"'{k}' (shape: {v.shape})")
+
+        if skipped_keys_info:
+            logger.info(f"Intentionally skipped loading from checkpoint: {', '.join(skipped_keys_info)}. "
+                        "FMT will use its freshly initialized versions for these.")
+
+        # strict=False because fmt_model has pos_embed & alignment_mask, but final_sd_to_load doesn't.
+        mismatched = fmt_model.load_state_dict(final_sd_to_load, strict=False)
+
+        # Check for other unexpected mismatches
+        actual_missing_keys = [k for k in mismatched.missing_keys if k not in keys_to_skip_loading]
+        if actual_missing_keys:
+            logger.warning(f"FMT: Missing keys after load (excluding intentionally skipped): {actual_missing_keys}")
+        if mismatched.unexpected_keys:  # Should be empty if final_sd_to_load was subset of model
+            logger.warning(f"FMT: Unexpected keys from checkpoint subset during load: {mismatched.unexpected_keys}")
+
+        # Store relevant settings on the instance
+        fmt_model.final_construction_options = {k: v for k, v in vars(opt_for_fmt).items() if not k.startswith('_')}
+        fmt_model.cudnn_benchmark_enabled_setting = cudnn_benchmark
+
+        final_target_device = torch.device(target_device)
+        fmt_model.to(final_target_device)
+        fmt_model.eval()
+        logger.info(f"FlowMatchingTransformer loaded to {final_target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
+
+        # Output options dict that was used for construction + any passthrough
+        fmt_options_out = {**current_advanced_options, **vars(opt_for_fmt)}
+        # Clean up non-serializable or large items from fmt_options_out if necessary, e.g. rank
+        if 'rank' in fmt_options_out:
+            fmt_options_out['rank'] = str(fmt_options_out['rank'])
+
+        return (fmt_model, fmt_options_out)
