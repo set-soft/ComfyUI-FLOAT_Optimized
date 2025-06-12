@@ -168,7 +168,7 @@ class LoadWav2VecModel:
 
 class FloatAudioPreprocessAndFeatureExtract:
     UNIQUE_NAME = "FloatAudioPreprocessAndFeatureExtract"
-    DISPLAY_NAME = "FLOAT Audio Feature Extract"  # Slightly shorter name
+    DISPLAY_NAME = "FLOAT Audio Feature Extract"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -1019,8 +1019,8 @@ class ApplyFloatSynthesis:
             "required": {
                 "s_r_latent": ("TORCH_TENSOR",),
                 "s_r_feats_dict": ("FLOAT_FEATS_DICT",),
-                "r_d_latents": ("TORCH_TENSOR",),
                 "float_synthesis": ("FLOAT_SYNTHESIS_MODEL",),
+                "r_d_latents": ("TORCH_TENSOR",),
             }
         }
 
@@ -1030,8 +1030,8 @@ class ApplyFloatSynthesis:
 
     def apply_synthesis(self, s_r_latent: torch.Tensor,
                         s_r_feats_dict: Dict[str, List[torch.Tensor]],
-                        r_d_latents: torch.Tensor,
-                        float_synthesis: FloatSynthesisModule):
+                        float_synthesis: FloatSynthesisModule,
+                        r_d_latents: torch.Tensor):
 
         synthesis_device = float_synthesis.target_device
         cudnn_benchmark_to_use = float_synthesis.cudnn_benchmark_setting
@@ -1125,8 +1125,8 @@ class FloatGetIdentityReferenceVA:
             }
         }
 
-    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_SYNTHESIS_MODEL")
-    RETURN_NAMES = ("r_s_latent", "float_synthesis_out")
+    RETURN_TYPES = ("FLOAT_SYNTHESIS_MODEL", "TORCH_TENSOR")
+    RETURN_NAMES = ("float_synthesis_out", "r_s_latent")
     FUNCTION = "get_identity_reference_batch"
     CATEGORY = BASE_CATEGORY
     DESCRIPTION = "Derives the batched identity reference latent (r_s) from r_s_lambda."
@@ -1166,7 +1166,7 @@ class FloatGetIdentityReferenceVA:
 
                 r_s_latent_batch_cpu = r_s_latent_batch_gpu.cpu()
 
-                return (r_s_latent_batch_cpu, synthesis_module)
+                return (synthesis_module, r_s_latent_batch_cpu)
 
             finally:
                 # Offload after use if it's not the CPU (standard ComfyUI practice for GPU models)
@@ -1233,8 +1233,8 @@ class LoadFMTModel:
         }
 
     # Outputting key inferred and used parameters
-    RETURN_TYPES = ("FLOAT_FMT_MODEL", "ADV_FLOAT_DICT")
-    RETURN_NAMES = ("float_fmt_model", "fmt_options_out")
+    RETURN_TYPES = ("FLOAT_FMT_MODEL", "FLOAT", "ADV_FLOAT_DICT")
+    RETURN_NAMES = ("float_fmt_model", "fps", "fmt_options_out")
     FUNCTION = "load_fmt_model"
 
     def load_fmt_model(self, fmt_file: str, target_device: str, cudnn_benchmark: bool,
@@ -1399,7 +1399,7 @@ class LoadFMTModel:
         if 'rank' in fmt_options_out:
             fmt_options_out['rank'] = str(fmt_options_out['rank'])
 
-        return (fmt_model, fmt_options_out)
+        return (fmt_model, fps, fmt_options_out)
 
 
 class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
@@ -1413,11 +1413,11 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
         base_opts = BaseOptions()
         return {
             "required": {
-                "float_fmt_model": ("FLOAT_FMT_MODEL",),  # From LoadFMTModel
                 "r_s_latent": ("TORCH_TENSOR",),
                 "wa_latent": ("TORCH_TENSOR",),
-                "we_latent": ("TORCH_TENSOR",),
                 "audio_num_frames": ("INT", {"forceInput": True}),
+                "we_latent": ("TORCH_TENSOR",),
+                "float_fmt_model": ("FLOAT_FMT_MODEL",),  # From LoadFMTModel
 
                 # CFG Scales
                 "a_cfg_scale": ("FLOAT", {"default": base_opts.a_cfg_scale, "min": 0.0, "max": 10.0, "step": 0.1}),
@@ -1448,9 +1448,8 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
     RETURN_NAMES = ("r_d_latents", "float_fmt_model_out")
     FUNCTION = "sample_rd_sequence_va"
 
-    def sample_rd_sequence_va(self, float_fmt_model: FlowMatchingTransformer,
-                              r_s_latent: torch.Tensor, wa_latent: torch.Tensor, we_latent: torch.Tensor,
-                              audio_num_frames: int,
+    def sample_rd_sequence_va(self, r_s_latent: torch.Tensor, wa_latent: torch.Tensor,
+                              we_latent: torch.Tensor, audio_num_frames: int, float_fmt_model: FlowMatchingTransformer,
                               a_cfg_scale: float, r_cfg_scale: float, e_cfg_scale: float,
                               nfe: int, torchdiffeq_ode_method: str, ode_atol: float, ode_rtol: float,
                               audio_dropout_prob: float, ref_dropout_prob: float, emotion_dropout_prob: float,
