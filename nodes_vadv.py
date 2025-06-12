@@ -1344,21 +1344,12 @@ class LoadFMTModel:
                 raise ValueError(f"Saved 'pos_embed' hidden dim ({hidden_size_from_pos_embed}) conflicts with "
                                  f"inferred/set opt.dim_h ({opt_for_fmt.dim_h}).")
             if num_total_frames_from_weights != num_total_frames_from_opts:
-                raise ValueError(f"Saved 'pos_embed' is for {num_total_frames_from_weights} total frames. "
-                                 f"Current input options (fps, wav2vec_sec, num_prev_frames) calculate to "
-                                 f"{num_total_frames_from_opts} frames. "
-                                 "These must match. Please adjust node inputs.")
+                logger.warning(f"Saved 'pos_embed' is for {num_total_frames_from_weights} total frames. "
+                               f"Current input options (fps, wav2vec_sec, num_prev_frames) calculate to "
+                               f"{num_total_frames_from_opts} frames. "
+                               "You might need to play with parameters.")
         else:
             logger.info("'pos_embed' key not found in checkpoint. FMT will initialize it based on current options.")
-
-        if 'alignment_mask' in loaded_sd:
-            mask_shape_from_weights = loaded_sd['alignment_mask'].shape
-            if (mask_shape_from_weights[0] != num_total_frames_from_opts or
-               mask_shape_from_weights[1] != num_total_frames_from_opts):
-                raise ValueError(f"Saved 'alignment_mask' shape {mask_shape_from_weights} is incompatible with calculated "
-                                 f"num_total_frames {num_total_frames_from_opts} from current input options. Adjust inputs.")
-        else:
-            logger.info("'alignment_mask' key not found in checkpoint. FMT will initialize it based on current options.")
 
         # --- 4. Instantiate FMT ---
         logger.info(f"Instantiating FlowMatchingTransformer with finalized options. "
