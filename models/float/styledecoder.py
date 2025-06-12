@@ -405,7 +405,8 @@ class ToFlow(nn.Module):
         xs = np.meshgrid(xs, xs)
         xs = np.stack(xs, 2)
 
-        xs = torch.tensor(xs, requires_grad=False).float().unsqueeze(0).repeat(input.size(0), 1, 1, 1).cuda()
+        target_device = input.device
+        xs = torch.tensor(xs, requires_grad=False, device=target_device).float().unsqueeze(0).repeat(input.size(0), 1, 1, 1)
 
         if skip is not None:
             skip = self.upsample(skip)
@@ -413,6 +414,7 @@ class ToFlow(nn.Module):
 
         sampler = torch.tanh(out[:, 0:2, :, :])
         mask = torch.sigmoid(out[:, 2:3, :, :])
+
         flow = sampler.permute(0, 2, 3, 1) + xs     # B x h x w 2
         feat_warp = F.grid_sample(feat, flow, align_corners=False) * mask
 
