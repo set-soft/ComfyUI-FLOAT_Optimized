@@ -75,14 +75,10 @@ class LoadWav2VecModel:
                 "model_folder": (model_folders, {"default": default_model}),
                 "target_device": (device_options, {"default": default_device}),
             },
-            "optional": {
-                # This dict would come from FloatAdvancedParameters or be manually created
-                "advanced_float_options": ("ADV_FLOAT_DICT",)
-            }
         }
 
-    RETURN_TYPES = ("WAV2VEC_PIPE",)  # Pipe: (model, feature_extractor, effective_options)
-    RETURN_NAMES = ("wav2vec_pipe",)
+    RETURN_TYPES = ("INT", "WAV2VEC_PIPE")  # Pipe: (model, feature_extractor, effective_options)
+    RETURN_NAMES = ("sampling_rate", "wav2vec_pipe")
     FUNCTION = "load_float_wav2vec_model"
     CATEGORY = BASE_CATEGORY + "/Loaders"
 
@@ -91,7 +87,6 @@ class LoadWav2VecModel:
         from transformers import Wav2Vec2Model as HFWav2Vec2ModelForLoadingWeights
         from transformers import Wav2Vec2FeatureExtractor
         from transformers import AutoConfig
-        from copy import deepcopy
         # Import your custom model class
         from .models.wav2vec2 import Wav2VecModel as FloatWav2VecModel
 
@@ -136,29 +131,16 @@ class LoadWav2VecModel:
 
             float_wav2vec_instance.target_device = device
             float_wav2vec_instance.eval()
+            float_wav2vec_instance.hf_model_hidden_size = config.hidden_size  # Actual hidden size of loaded model
 
-            # --- Prepare effective_options_dict ---
-            base_opt_defaults = BaseOptions()
-            effective_options = {
-                "sampling_rate": base_opt_defaults.sampling_rate,
-                "only_last_features": base_opt_defaults.only_last_features,
-                "wav2vec_sec": base_opt_defaults.wav2vec_sec,
-                "fps": base_opt_defaults.fps,
-                "dim_w": base_opt_defaults.dim_w,
-            }
-            effective_options["hf_model_hidden_size"] = config.hidden_size  # Actual hidden size of loaded model
-            if hasattr(feature_extractor, 'sampling_rate') and feature_extractor.sampling_rate:
-                effective_options["sampling_rate"] = feature_extractor.sampling_rate
-
-            if advanced_float_options:
-                options_to_merge = deepcopy(advanced_float_options)
-                effective_options.update(options_to_merge)
-                main_logger.info(f"Applied advanced_float_options: {options_to_merge}")
-
-            main_logger.info(f"Effective options for loaded FloatWav2VecModel: {effective_options}")
+            try:
+                sampling_rate = feature_extractor.sampling_rate
+            except Exception:
+                sampling_rate = BaseOptions().sampling_rate
+            float_wav2vec_instance.expected_sr = sampling_rate
 
             # Pipe now contains your custom model instance
-            return ((float_wav2vec_instance, feature_extractor, effective_options),)
+            return (sampling_rate, (float_wav2vec_instance, feature_extractor))
         except Exception as e:
             main_logger.error(f"Error loading Wav2Vec model from {model_path} into FloatWav2VecModel: {e}")
             import traceback
@@ -175,26 +157,24 @@ class FloatAudioPreprocessAndFeatureExtract:
         return {
             "required": {
                 "audio": ("AUDIO",),  # Expects pre-processed mono audio at correct SR
-                "wav2vec_pipe": ("WAV2VEC_PIPE",),  # (model, feature_extractor, effective_options)
+                "wav2vec_pipe": ("WAV2VEC_PIPE",),  # (model, feature_extractor)
                 "target_fps": ("FLOAT", {"default": 25.0, "min": 1.0, "step": 0.1}),
+                "only_last_features": ("BOOLEAN", {"default": False}),
             }
         }
 
-    RETURN_TYPES = ("TORCH_TENSOR", "INT", "TORCH_TENSOR", "ADV_FLOAT_DICT", "WAV2VEC_PIPE")
-    RETURN_NAMES = ("wav2vec_features", "audio_num_frames", "input_audio_batch_for_emotion", "effective_options",
-                    "wav2vec_pipe_out")
+    RETURN_TYPES = ("TORCH_TENSOR", "INT", "TORCH_TENSOR", "WAV2VEC_PIPE")
+    RETURN_NAMES = ("wav2vec_features", "audio_num_frames", "processed_audio_features", "wav2vec_pipe_out")
     FUNCTION = "extract_features_with_custom_model"
     CATEGORY = BASE_CATEGORY
 
-    def extract_features_with_custom_model(self, audio: Dict, wav2vec_pipe: tuple, target_fps: float):
-        if not isinstance(wav2vec_pipe, tuple) or len(wav2vec_pipe) != 3:
-            raise TypeError("wav2vec_pipe is not in the expected format (model, feature_extractor, options_dict).")
+    def extract_features_with_custom_model(self, audio: Dict, wav2vec_pipe: tuple, target_fps: float,
+                                           only_last_features: bool):
+        if not isinstance(wav2vec_pipe, tuple) or len(wav2vec_pipe) != 2:
+            raise TypeError("wav2vec_pipe is not in the expected format (model, feature_extractor).")
 
-        float_wav2vec_model_instance, feature_extractor, effective_options = wav2vec_pipe
-
-        expected_sr = effective_options.get("sampling_rate", 16000)
-        only_last_features = effective_options.get("only_last_features", False)  # Align with BaseOptions default
-
+        float_wav2vec_model_instance, feature_extractor = wav2vec_pipe
+        expected_sr = float_wav2vec_model_instance.expected_sr
         current_rank_device = float_wav2vec_model_instance.target_device
 
         # --- Input Audio Batch Handling & Validation (same as before) ---
@@ -275,7 +255,6 @@ class FloatAudioPreprocessAndFeatureExtract:
         return (wav2vec_features_gpu.cpu(),
                 audio_num_frames,
                 preprocessed_audio_batched_cpu.cpu(),
-                effective_options,
                 wav2vec_pipe)
 
 
