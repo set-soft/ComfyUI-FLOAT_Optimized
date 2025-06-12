@@ -21,21 +21,11 @@ import comfy.utils
 from .options.base_options import BaseOptions
 from .utils.image import img_tensor_2_np_array, process_img
 from .utils.torch import manage_cudnn_benchmark
-from .utils.misc import EMOTIONS, NODES_NAME
+from .utils.misc import EMOTIONS, NODES_NAME, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .generate import InferenceAgent
 from .models.float.FMT import FlowMatchingTransformer
 
 BASE_CATEGORY = "FLOAT/Advanced"
-# List of fixed-step solvers you from torchdiffeq
-TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
-    "euler",
-    "midpoint",
-    "rk4",        # Classical Runge-Kutta 4th order
-    "heun2",      # Heun's method (RK2)
-    "heun3",      # Heun's method (RK3)
-    # "explicit_adams", # Fixed-step Adams-Bashforth (multi-step, might need more params like order)
-    # "implicit_adams", # Fixed-step Adams-Moulton (multi-step, implicit)
-]
 RGBA_CONVERSION_STRATEGIES = [
     "blend_with_color",
     "discard_alpha",
