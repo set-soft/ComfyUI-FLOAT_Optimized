@@ -1212,11 +1212,6 @@ class LoadFMTModel:
                 "num_prev_frames": ("INT", {"default": base_opts.num_prev_frames, "min": 0, "max": 100}),
                 "fps": ("FLOAT", {"default": base_opts.fps, "min": 1.0, "max": 120.0, "step": 0.1}),
                 "wav2vec_sec": ("FLOAT", {"default": base_opts.wav2vec_sec, "min": 0.1, "max": 10.0, "step": 0.1}),
-            },
-            "optional": {
-                # This is now primarily for any *other* BaseOptions overrides the user might want,
-                # not for the critical structural ones listed above.
-                "advanced_float_options": ("ADV_FLOAT_DICT", {"default": {}})
             }
         }
 
@@ -1227,8 +1222,7 @@ class LoadFMTModel:
 
     def load_fmt_model(self, fmt_file: str, target_device: str, cudnn_benchmark: bool,
                        dim_e: int, num_heads: int, attention_window: int,
-                       num_prev_frames: int, fps: float, wav2vec_sec: float,
-                       advanced_float_options: dict = None):
+                       num_prev_frames: int, fps: float, wav2vec_sec: float):
 
         if fmt_file == "No FMT files found":
             raise FileNotFoundError(f"No FMT .safetensors files found in 'models/{FMT_SUBDIR}/'.")
@@ -1294,16 +1288,6 @@ class LoadFMTModel:
 
         # --- 2. Prepare opt_for_fmt using inferred and input values ---
         opt_for_fmt = BaseOptions()  # Start with BaseOptions defaults
-
-        # Apply advanced_float_options first for any general overrides
-        current_advanced_options = advanced_float_options if advanced_float_options is not None else {}
-        for key, value in current_advanced_options.items():
-            if hasattr(opt_for_fmt, key):
-                setattr(opt_for_fmt, key, value)
-            else:  # Allow setting attributes not in BaseOptions if user explicitly passes them
-                logger.warning(f"Option '{key}' from advanced_float_options is not in BaseOptions. Setting it on opt_for_fmt.")
-                setattr(opt_for_fmt, key, value)
-
         # Override with inferred and direct input values (these are authoritative for structure)
         opt_for_fmt.rank = torch.device(target_device)  # For mask creation device
         opt_for_fmt.dim_h = inferred_dim_h
@@ -1317,8 +1301,6 @@ class LoadFMTModel:
         opt_for_fmt.num_prev_frames = num_prev_frames
         opt_for_fmt.fps = fps
         opt_for_fmt.wav2vec_sec = wav2vec_sec
-        # opt_for_fmt.no_learned_pe is taken from BaseOptions/advanced_float_options,
-        # but as discussed, it doesn't change FMT.py's pos_embed type.
 
         # --- 3. Validate pos_embed and alignment_mask dimensions against current opt_for_fmt ---
         # These will be used by FMT.__init__ to size its internal pos_embed and alignment_mask
@@ -1381,8 +1363,8 @@ class LoadFMTModel:
         fmt_model.eval()
         logger.info(f"FlowMatchingTransformer loaded to {final_target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
 
-        # Output options dict that was used for construction + any passthrough
-        fmt_options_out = {**current_advanced_options, **vars(opt_for_fmt)}
+        # Output options dict that was used for construction
+        fmt_options_out = {**vars(opt_for_fmt)}
         # Clean up non-serializable or large items from fmt_options_out if necessary, e.g. rank
         if 'rank' in fmt_options_out:
             fmt_options_out['rank'] = str(fmt_options_out['rank'])
