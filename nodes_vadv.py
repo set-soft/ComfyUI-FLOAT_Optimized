@@ -360,6 +360,9 @@ class LoadAudioProjectionLayer:
         projection_layer.eval()
         main_logger.info(f"Audio projection layer loaded to {target_device} and set to eval mode.")
 
+        projection_layer.inferred_input_feature_dim = inferred_input_feature_dim
+        projection_layer.dim_a = dim_a
+
         return (projection_layer, inferred_input_feature_dim, dim_a)
 
 
@@ -387,6 +390,12 @@ class FloatApplyAudioProjection:
             raise TypeError("Input 'wav2vec_features' must be a torch.Tensor.")
         if not isinstance(projection_layer, torch.nn.Module):
             raise TypeError("Input 'projection_layer' must be a torch.nn.Module.")
+        if wav2vec_features.ndim != 3:
+            raise TypeError("Input 'wav2vec_features' must contain 3 dimensions")
+        if wav2vec_features.shape[2] != projection_layer.inferred_input_feature_dim:
+            raise TypeError("Input 'wav2vec_features' wrong size has "
+                            f"{wav2vec_features.shape[2]}, expected {projection_layer.inferred_input_feature_dim}. "
+                            "`only_last_features` mismatch?")
 
         # Determine the device from the projection_layer (it should already be on its target device)
         target_device = next(projection_layer.parameters()).device
