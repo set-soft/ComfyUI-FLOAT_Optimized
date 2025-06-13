@@ -355,8 +355,7 @@ class LoadAudioProjectionLayer:
             main_logger.error(f"Error loading projection weights from {weights_path}: {e}")
             raise
 
-        device = torch.device(target_device)
-        projection_layer.to(device)
+        projection_layer.target_device = torch.device(target_device)
         projection_layer.eval()
         main_logger.info(f"Audio projection layer loaded to {target_device} and set to eval mode.")
 
@@ -398,7 +397,7 @@ class FloatApplyAudioProjection:
                             "`only_last_features` mismatch?")
 
         # Determine the device from the projection_layer (it should already be on its target device)
-        target_device = next(projection_layer.parameters()).device
+        target_device = projection_layer.target_device
 
         features_on_device = wav2vec_features.to(target_device)
 
@@ -408,7 +407,11 @@ class FloatApplyAudioProjection:
         # If features are (B, T, D_in), Linear layer will operate on D_in.
         with torch.no_grad():  # Ensure no gradients for this application
             projection_layer.eval()  # Ensure it's in eval mode
-            wa_latent_gpu = projection_layer(features_on_device)  # (B, NumFrames, D_target_w)
+            projection_layer.to(target_device)
+            try:
+                wa_latent_gpu = projection_layer(features_on_device)  # (B, NumFrames, D_target_w)
+            finally:
+                projection_layer.to(mm.unet_offload_device())
 
         main_logger.info(f"Output wa_latent shape: {wa_latent_gpu.shape}")
 
