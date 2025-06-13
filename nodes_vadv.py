@@ -14,12 +14,11 @@ import torch.nn.functional as F
 from typing import List, Dict  # , NewType
 # ComfyUI
 import comfy.utils
-import comfy.model_management as mm
 import folder_paths
 
 from .options.base_options import BaseOptions
 from .utils.logger import main_logger
-from .utils.torch import get_torch_device_options, manage_cudnn_benchmark
+from .utils.torch import get_torch_device_options, model_to_target
 from .utils.misc import EMOTIONS, NODES_NAME, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .models.float.encoder import Encoder as FloatEncoderModule
 from .models.float.styledecoder import Synthesis as FloatSynthesisModule
@@ -130,7 +129,6 @@ class LoadWav2VecModel:
             feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_path)
 
             float_wav2vec_instance.target_device = device
-            float_wav2vec_instance.eval()
             float_wav2vec_instance.hf_model_hidden_size = config.hidden_size  # Actual hidden size of loaded model
 
             try:
@@ -215,40 +213,35 @@ class FloatAudioPreprocessAndFeatureExtract:
         # --- Inference using FloatWav2VecModel instance ---
         # Its forward(self, input_values, seq_len, ...) handles interpolation.
         wav2vec_features_gpu = None
-        with torch.no_grad():
-            float_wav2vec_model_instance.eval()  # Ensure eval mode
-            float_wav2vec_model_instance.to(current_rank_device)
-            try:
-                # Call custom model's forward method.
-                # The original AudioEncoder's get_wav2vec2_feature does:
-                #   a = self.wav2vec2(a, seq_len=seq_len, output_hidden_states=not self.only_last_features)
-                #   if self.only_last_features: a = a.last_hidden_state
-                #   else: a = torch.stack(a.hidden_states[1:], dim=1).permute(0, 2, 1, 3).reshape(B, T, -1)
+        with model_to_target(float_wav2vec_model_instance):
+            # Call custom model's forward method.
+            # The original AudioEncoder's get_wav2vec2_feature does:
+            #   a = self.wav2vec2(a, seq_len=seq_len, output_hidden_states=not self.only_last_features)
+            #   if self.only_last_features: a = a.last_hidden_state
+            #   else: a = torch.stack(a.hidden_states[1:], dim=1).permute(0, 2, 1, 3).reshape(B, T, -1)
 
-                model_output = float_wav2vec_model_instance(
-                    input_values=audio_on_device,
-                    seq_len=audio_num_frames,  # This is used for interpolation inside the model
-                    output_hidden_states=not only_last_features  # Request hidden states if needed
+            model_output = float_wav2vec_model_instance(
+                input_values=audio_on_device,
+                seq_len=audio_num_frames,  # This is used for interpolation inside the model
+                output_hidden_states=not only_last_features  # Request hidden states if needed
+            )
+
+            if only_last_features:
+                wav2vec_features_gpu = model_output.last_hidden_state  # (B, audio_num_frames, D_hidden)
+            else:
+                if model_output.hidden_states is None or len(model_output.hidden_states) <= 1:
+                    raise ValueError("Requested all hidden states (only_last_features=False) but model did "
+                                     "not return them or not enough layers.")
+                # hidden_states is a tuple of tensors (B, interpolated_T, D_hidden) for each layer
+                # The first element (index 0) is usually the input embeddings.
+                # Original AudioEncoder stacks from hidden_states[1:].
+                # (B, T_interpolated, NumLayers, D_hidden)
+                stacked_hidden_states = torch.stack(model_output.hidden_states[1:], dim=2)
+                wav2vec_features_gpu = stacked_hidden_states.reshape(
+                    batch_size,
+                    audio_num_frames,  # T_interpolated should match audio_num_frames
+                    -1  # NumLayers * D_hidden
                 )
-
-                if only_last_features:
-                    wav2vec_features_gpu = model_output.last_hidden_state  # (B, audio_num_frames, D_hidden)
-                else:
-                    if model_output.hidden_states is None or len(model_output.hidden_states) <= 1:
-                        raise ValueError("Requested all hidden states (only_last_features=False) but model did "
-                                         "not return them or not enough layers.")
-                    # hidden_states is a tuple of tensors (B, interpolated_T, D_hidden) for each layer
-                    # The first element (index 0) is usually the input embeddings.
-                    # Original AudioEncoder stacks from hidden_states[1:].
-                    # (B, T_interpolated, NumLayers, D_hidden)
-                    stacked_hidden_states = torch.stack(model_output.hidden_states[1:], dim=2)
-                    wav2vec_features_gpu = stacked_hidden_states.reshape(
-                        batch_size,
-                        audio_num_frames,  # T_interpolated should match audio_num_frames
-                        -1  # NumLayers * D_hidden
-                    )
-            finally:
-                float_wav2vec_model_instance.to(mm.unet_offload_device())
 
         main_logger.debug(f"Extracted Wav2Vec features with custom model: shape {wav2vec_features_gpu.shape}")
 
@@ -356,7 +349,6 @@ class LoadAudioProjectionLayer:
             raise
 
         projection_layer.target_device = torch.device(target_device)
-        projection_layer.eval()
         main_logger.info(f"Audio projection layer loaded to {target_device} and set to eval mode.")
 
         projection_layer.inferred_input_feature_dim = inferred_input_feature_dim
@@ -405,13 +397,8 @@ class FloatApplyAudioProjection:
 
         # The projection layer expects (B, T, D_in) or (N, D_in) and processes the last dimension.
         # If features are (B, T, D_in), Linear layer will operate on D_in.
-        with torch.no_grad():  # Ensure no gradients for this application
-            projection_layer.eval()  # Ensure it's in eval mode
-            projection_layer.to(target_device)
-            try:
-                wa_latent_gpu = projection_layer(features_on_device)  # (B, NumFrames, D_target_w)
-            finally:
-                projection_layer.to(mm.unet_offload_device())
+        with model_to_target(projection_layer):
+            wa_latent_gpu = projection_layer(features_on_device)  # (B, NumFrames, D_target_w)
 
         main_logger.info(f"Output wa_latent shape: {wa_latent_gpu.shape}")
 
@@ -485,7 +472,6 @@ class LoadEmotionRecognitionModel:
             feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_path)  # Emotion models usually bundle their FE
 
             emotion_model.target_device = device
-            emotion_model.eval()
 
             # We need to know how many emotions are available
             if not hasattr(config, "num_labels"):
@@ -574,30 +560,25 @@ class FloatExtractEmotionWithCustomModel:
             logger.warning("label2id map not available in loaded emotion model config. Cannot use specified emotion "
                            f"'{selected_emotion_lower}'. Predicting from audio.")
 
-        with torch.no_grad():
-            emotion_model.eval()
-            emotion_model.to(current_rank_device)
-            try:
-                # Predict if "none" or if specified emotion is not valid/mappable
-                if selected_emotion_lower == "none" or emo_idx is None:
-                    if selected_emotion_lower != "none" and emo_idx is None:  # Tried to specify but failed
-                        logger.info(f"Failed to map '{selected_emotion_lower}'. Predicting emotion from audio features.")
-                    else:  # Explicitly "none" or successfully mapped emo_idx is None (should not happen if map exists)
-                        logger.info("Predicting emotion from audio features using custom model.")
+        with model_to_target(emotion_model):
+            # Predict if "none" or if specified emotion is not valid/mappable
+            if selected_emotion_lower == "none" or emo_idx is None:
+                if selected_emotion_lower != "none" and emo_idx is None:  # Tried to specify but failed
+                    logger.info(f"Failed to map '{selected_emotion_lower}'. Predicting emotion from audio features.")
+                else:  # Explicitly "none" or successfully mapped emo_idx is None (should not happen if map exists)
+                    logger.info("Predicting emotion from audio features using custom model.")
 
-                    # The `emotion_model` (Wav2Vec2ForSequenceClassification) directly takes `input_values`
-                    # which is what `processed_audio_features` represents.
-                    logits = emotion_model(input_values=audio_on_device_emo).logits  # (B, NumLabels)
-                    scores_batch = F.softmax(logits, dim=-1)  # (B, NumLabels)
-                    we_latent_gpu = scores_batch.unsqueeze(1)  # (B, 1, NumLabels)
-                else:  # Valid emo_idx found
-                    logger.info(f"Using specified emotion: {selected_emotion_lower} (index {emo_idx}) for batch "
-                                f"size {batch_size}.")
-                    one_hot_single = F.one_hot(torch.tensor(emo_idx, device=current_rank_device),
-                                               num_classes=num_labels).float()
-                    we_latent_gpu = one_hot_single.unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1)  # (B, 1, NumLabels)
-            finally:
-                emotion_model.to(mm.unet_offload_device())
+                # The `emotion_model` (Wav2Vec2ForSequenceClassification) directly takes `input_values`
+                # which is what `processed_audio_features` represents.
+                logits = emotion_model(input_values=audio_on_device_emo).logits  # (B, NumLabels)
+                scores_batch = F.softmax(logits, dim=-1)  # (B, NumLabels)
+                we_latent_gpu = scores_batch.unsqueeze(1)  # (B, 1, NumLabels)
+            else:  # Valid emo_idx found
+                logger.info(f"Using specified emotion: {selected_emotion_lower} (index {emo_idx}) for batch "
+                            f"size {batch_size}.")
+                one_hot_single = F.one_hot(torch.tensor(emo_idx, device=current_rank_device),
+                                           num_classes=num_labels).float()
+                we_latent_gpu = one_hot_single.unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1)  # (B, 1, NumLabels)
 
         return (we_latent_gpu.cpu(), emotion_model_pipe)
 
@@ -738,7 +719,6 @@ class LoadFloatEncoderModel:
         encoder_model.cudnn_benchmark_setting = cudnn_benchmark  # Store this setting
 
         encoder_model.target_device = torch.device(target_device)
-        encoder_model.eval()
         logger.info(f"FLOAT Encoder (inferred arch) loaded to {target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
 
         return (encoder_model, inferred_input_size, dim_w, dim_m)
@@ -766,7 +746,6 @@ class ApplyFloatEncoder:
 
         # Get settings from the float_encoder instance
         encoder_device = float_encoder.target_device
-        cudnn_benchmark_to_use = float_encoder.cudnn_benchmark_setting
 
         # For validation, get structural params from encoder instance
         # And general params like input_nc from BaseOptions defaults
@@ -790,32 +769,25 @@ class ApplyFloatEncoder:
 
         local_comfy_pbar = None  # No pbar for this apply node for now
 
-        # Use the simplified CUDNN context manager
-        with manage_cudnn_benchmark(cudnn_benchmark_to_use, encoder_device):
-            float_encoder.to(encoder_device)
-            try:
-                s_for_encoder = ref_image.permute(0, 3, 1, 2).contiguous()
-                s_for_encoder = (s_for_encoder * 2.0) - 1.0
-                s_for_encoder = s_for_encoder.to(encoder_device)
+        with model_to_target(float_encoder):
+            s_for_encoder = ref_image.permute(0, 3, 1, 2).contiguous()
+            s_for_encoder = (s_for_encoder * 2.0) - 1.0
+            s_for_encoder = s_for_encoder.to(encoder_device)
 
-                float_encoder.eval()
-                with torch.no_grad():
-                    s_r_batch_gpu, r_s_lambda_intermediate, s_r_feats_batch_list_gpu = \
-                        float_encoder(input_source=s_for_encoder, input_target=None, h_start=None, pbar=local_comfy_pbar)
+            s_r_batch_gpu, r_s_lambda_intermediate, s_r_feats_batch_list_gpu = \
+                float_encoder(input_source=s_for_encoder, input_target=None, h_start=None, pbar=local_comfy_pbar)
 
-                    if r_s_lambda_intermediate is None:  # Should be None if input_target is None
-                        r_s_lambda_batch_gpu = float_encoder.fc(s_r_batch_gpu)
-                    else:  # This path should ideally not be taken with current usage
-                        r_s_lambda_batch_gpu = r_s_lambda_intermediate
+            if r_s_lambda_intermediate is None:  # Should be None if input_target is None
+                r_s_lambda_batch_gpu = float_encoder.fc(s_r_batch_gpu)
+            else:  # This path should ideally not be taken with current usage
+                r_s_lambda_batch_gpu = r_s_lambda_intermediate
 
-                s_r_latent_cpu = s_r_batch_gpu.cpu()
-                r_s_lambda_latent_cpu = r_s_lambda_batch_gpu.cpu()
-                s_r_feats_cpu_list = [feat.cpu() for feat in s_r_feats_batch_list_gpu]
-                s_r_feats_dict_cpu = {"value": s_r_feats_cpu_list}
-            finally:
-                float_encoder.to(mm.unet_offload_device())
+            s_r_latent_cpu = s_r_batch_gpu.cpu()
+            r_s_lambda_latent_cpu = r_s_lambda_batch_gpu.cpu()
+            s_r_feats_cpu_list = [feat.cpu() for feat in s_r_feats_batch_list_gpu]
+            s_r_feats_dict_cpu = {"value": s_r_feats_cpu_list}
 
-            return (s_r_latent_cpu, s_r_feats_dict_cpu, r_s_lambda_latent_cpu, float_encoder)
+        return (s_r_latent_cpu, s_r_feats_dict_cpu, r_s_lambda_latent_cpu, float_encoder)
 
 
 class LoadFloatSynthesisModel:
@@ -993,7 +965,6 @@ class LoadFloatSynthesisModel:
         synthesis_model.cudnn_benchmark_setting = cudnn_benchmark
 
         synthesis_model.target_device = torch.device(target_device)
-        synthesis_model.eval()
         logger.info(f"FLOAT Synthesis (inferred arch) loaded to {target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
 
         return (synthesis_model, inferred_size, inferred_style_dim, inferred_motion_dim)
@@ -1025,7 +996,6 @@ class ApplyFloatSynthesis:
                         r_d_latents: torch.Tensor):
 
         synthesis_device = float_synthesis.target_device
-        cudnn_benchmark_to_use = float_synthesis.cudnn_benchmark_setting
 
         # Get structural params for validation if needed, and general defaults
         # input_size for output shape validation
@@ -1058,51 +1028,45 @@ class ApplyFloatSynthesis:
 
         comfy_pbar_decode = comfy.utils.ProgressBar(num_frames_to_decode * batch_size)
 
-        with manage_cudnn_benchmark(cudnn_benchmark_to_use, synthesis_device):
-            float_synthesis.to(synthesis_device)
-            try:
-                s_r_dev = s_r_latent.to(synthesis_device)
-                s_r_feats_dev_list = [feat.to(synthesis_device) for feat in s_r_feats_dict["value"]]
-                r_d_dev = r_d_latents.to(synthesis_device)
+        with model_to_target(float_synthesis):
+            s_r_dev = s_r_latent.to(synthesis_device)
+            s_r_feats_dev_list = [feat.to(synthesis_device) for feat in s_r_feats_dict["value"]]
+            r_d_dev = r_d_latents.to(synthesis_device)
 
-                decoded_image_sequences_list = []
-                float_synthesis.eval()
+            decoded_image_sequences_list = []
 
-                if batch_size > 1:
-                    logger.info(f"Applying Synthesis for batch {batch_size}, {num_frames_to_decode} frames each.")
+            if batch_size > 1:
+                logger.info(f"Applying Synthesis for batch {batch_size}, {num_frames_to_decode} frames each.")
 
-                for b_idx in range(batch_size):
-                    s_r_item = s_r_dev[b_idx].unsqueeze(0)
-                    s_r_feats_item_list = [feat[b_idx].unsqueeze(0) for feat in s_r_feats_dev_list]
-                    r_d_item_all_frames = r_d_dev[b_idx]  # (T, DimW)
+            for b_idx in range(batch_size):
+                s_r_item = s_r_dev[b_idx].unsqueeze(0)
+                s_r_feats_item_list = [feat[b_idx].unsqueeze(0) for feat in s_r_feats_dev_list]
+                r_d_item_all_frames = r_d_dev[b_idx]  # (T, DimW)
 
-                    frames_for_this_item = []
-                    for t in range(num_frames_to_decode):
-                        current_r_d_frame = r_d_item_all_frames[t].unsqueeze(0)  # (1, DimW)
-                        wa_for_frame_t = s_r_item + current_r_d_frame           # (1, DimW)
+                frames_for_this_item = []
+                for t in range(num_frames_to_decode):
+                    current_r_d_frame = r_d_item_all_frames[t].unsqueeze(0)  # (1, DimW)
+                    wa_for_frame_t = s_r_item + current_r_d_frame           # (1, DimW)
 
-                        with torch.no_grad():
-                            img_t_gpu, _flow_info = float_synthesis(wa=wa_for_frame_t, alpha=None, feats=s_r_feats_item_list)
+                    img_t_gpu, _flow_info = float_synthesis(wa=wa_for_frame_t, alpha=None, feats=s_r_feats_item_list)
 
-                        img_t_squeezed_gpu = img_t_gpu.squeeze(0)
-                        img_t_processed = img_t_squeezed_gpu.permute(1, 2, 0)
-                        img_t_processed = img_t_processed.clamp(-1, 1)
-                        img_t_processed = ((img_t_processed + 1) / 2)
-                        frames_for_this_item.append(img_t_processed.cpu())
-                        comfy_pbar_decode.update(1)
+                    img_t_squeezed_gpu = img_t_gpu.squeeze(0)
+                    img_t_processed = img_t_squeezed_gpu.permute(1, 2, 0)
+                    img_t_processed = img_t_processed.clamp(-1, 1)
+                    img_t_processed = ((img_t_processed + 1) / 2)
+                    frames_for_this_item.append(img_t_processed.cpu())
+                    comfy_pbar_decode.update(1)
 
-                    if frames_for_this_item:
-                        decoded_image_sequences_list.append(torch.stack(frames_for_this_item, dim=0))
+                if frames_for_this_item:
+                    decoded_image_sequences_list.append(torch.stack(frames_for_this_item, dim=0))
 
-                if not decoded_image_sequences_list:
-                    final_images_output_cpu = torch.empty((0, output_img_size, output_img_size, output_img_nc),
-                                                          dtype=torch.float32, device='cpu')
-                else:
-                    final_images_output_cpu = torch.cat(decoded_image_sequences_list, dim=0)
-            finally:
-                float_synthesis.to(mm.unet_offload_device())
+            if not decoded_image_sequences_list:
+                final_images_output_cpu = torch.empty((0, output_img_size, output_img_size, output_img_nc),
+                                                      dtype=torch.float32, device='cpu')
+            else:
+                final_images_output_cpu = torch.cat(decoded_image_sequences_list, dim=0)
 
-            return (final_images_output_cpu, float_synthesis)
+        return (final_images_output_cpu, float_synthesis)
 
 
 # TODO: Merge with non-VA version
@@ -1140,28 +1104,20 @@ class FloatGetIdentityReferenceVA:
             raise ValueError(f"Dimension 1 of 'r_s_lambda_latent' should be ({synthesis_module.inferred_motion_dim}), "
                              f"got {r_s_lambda_latent.shape[1]}.")
 
-        with manage_cudnn_benchmark(synthesis_module.cudnn_benchmark_setting, synthesis_device):
-            # Ensure model is on the correct device for THIS operation
+        # Ensure model is on the correct device for THIS operation
+        with model_to_target(synthesis_module):
             synthesis_module.to(synthesis_device)
-            try:
-                synthesis_module.to(synthesis_device)
-                r_s_lambda_dev = r_s_lambda_latent.to(synthesis_device)
+            r_s_lambda_dev = r_s_lambda_latent.to(synthesis_device)
 
-                # --- Core Operation ---
-                # synthesis_module.direction() should handle a batch input for r_s_lambda.
-                # If r_s_lambda_dev is (B, dim_m), then r_s_latent should be (B, style_dim)
-                # where style_dim is derived from the weights of the Direction layer (512 in original code).
-                synthesis_module.eval()  # Ensure eval mode
-                with torch.no_grad():
-                    r_s_latent_batch_gpu = synthesis_module.direction(r_s_lambda_dev)
+            # --- Core Operation ---
+            # synthesis_module.direction() should handle a batch input for r_s_lambda.
+            # If r_s_lambda_dev is (B, dim_m), then r_s_latent should be (B, style_dim)
+            # where style_dim is derived from the weights of the Direction layer (512 in original code).
+            r_s_latent_batch_gpu = synthesis_module.direction(r_s_lambda_dev)
 
-                r_s_latent_batch_cpu = r_s_latent_batch_gpu.cpu()
+            r_s_latent_batch_cpu = r_s_latent_batch_gpu.cpu()
 
-                return (synthesis_module, r_s_latent_batch_cpu)
-
-            finally:
-                # Offload after use if it's not the CPU (standard ComfyUI practice for GPU models)
-                synthesis_module.to(mm.unet_offload_device())
+            return (synthesis_module, r_s_latent_batch_cpu)
 
 
 class LoadFMTModel:
@@ -1359,11 +1315,10 @@ class LoadFMTModel:
 
         # Store relevant settings on the instance
         fmt_model.final_construction_options = {k: v for k, v in vars(opt_for_fmt).items() if not k.startswith('_')}
-        fmt_model.cudnn_benchmark_enabled_setting = cudnn_benchmark
+        fmt_model.cudnn_benchmark_setting = cudnn_benchmark
 
         final_target_device = torch.device(target_device)
         fmt_model.target_device = final_target_device
-        fmt_model.eval()
         logger.info(f"FlowMatchingTransformer loaded to {final_target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
 
         # Output options dict that was used for construction
@@ -1449,7 +1404,6 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
         model_dim_w = construction_opts_source.dim_w
 
         target_device_for_sampling = float_fmt_model.target_device  # Get device from model
-        cudnn_benchmark_to_use = getattr(float_fmt_model, 'cudnn_benchmark_enabled_setting', False)
 
         # --- Input Validation (similar to Advanced version) ---
         if not all(isinstance(t, torch.Tensor) for t in [r_s_latent, wa_latent, we_latent]):
@@ -1498,50 +1452,42 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
         wa_latent_dev = wa_latent.to(target_device_for_sampling)
         we_latent_dev = we_latent.to(target_device_for_sampling)
 
-        # float_fmt_model is already on its target_device from the loader.
-        # No need to move it again unless manage_cudnn_benchmark needs the model itself.
-        # The _perform_ode_sampling_loop assumes fmt_model is already on target_device.
-
         logger.info(f"Calling ODE sampling loop for VA node, {batch_size} item(s).")
-        float_fmt_model.to(target_device_for_sampling)
-        try:
-            r_d_latents_gpu = _perform_ode_sampling_loop(
-                fmt_model=float_fmt_model,  # Pass the loaded model
-                r_s_latent_dev=r_s_latent_dev,
-                wa_latent_dev=wa_latent_dev,
-                we_latent_dev=we_latent_dev,
-                audio_num_frames=audio_num_frames,
-                model_num_prev_frames=model_num_prev_frames,
-                model_num_frames_for_clip=model_num_frames_for_clip,
-                model_dim_w=model_dim_w,
-                ode_nfe=nfe,  # From direct input
-                ode_method=torchdiffeq_ode_method,  # From direct input
-                ode_atol=ode_atol,  # From direct input
-                ode_rtol=ode_rtol,  # From direct input
-                target_device=target_device_for_sampling,
-                a_cfg_scale=a_cfg_scale,  # From direct input
-                r_cfg_scale=r_cfg_scale,  # From direct input
-                e_cfg_scale=e_cfg_scale,  # From direct input
-                noise_seed_generator=noise_gen,  # Configured generator
-                cudnn_benchmark_enabled=cudnn_benchmark_to_use
-            )
-            r_d_latents_cpu = r_d_latents_gpu.cpu()
+        with model_to_target(float_fmt_model):
+            try:
+                r_d_latents_gpu = _perform_ode_sampling_loop(
+                    fmt_model=float_fmt_model,  # Pass the loaded model
+                    r_s_latent_dev=r_s_latent_dev,
+                    wa_latent_dev=wa_latent_dev,
+                    we_latent_dev=we_latent_dev,
+                    audio_num_frames=audio_num_frames,
+                    model_num_prev_frames=model_num_prev_frames,
+                    model_num_frames_for_clip=model_num_frames_for_clip,
+                    model_dim_w=model_dim_w,
+                    ode_nfe=nfe,  # From direct input
+                    ode_method=torchdiffeq_ode_method,  # From direct input
+                    ode_atol=ode_atol,  # From direct input
+                    ode_rtol=ode_rtol,  # From direct input
+                    target_device=target_device_for_sampling,
+                    a_cfg_scale=a_cfg_scale,  # From direct input
+                    r_cfg_scale=r_cfg_scale,  # From direct input
+                    e_cfg_scale=e_cfg_scale,  # From direct input
+                    noise_seed_generator=noise_gen  # Configured generator
+                )
+                r_d_latents_cpu = r_d_latents_gpu.cpu()
 
-            # Restore original dropout probabilities on the fmt_model's opt object
-            float_fmt_model.opt.audio_dropout_prob = original_dropout_probs["audio"]
-            float_fmt_model.opt.ref_dropout_prob = original_dropout_probs["ref"]
-            float_fmt_model.opt.emotion_dropout_prob = original_dropout_probs["emotion"]
-            logger.debug("Restored original dropout probabilities on FMT model's opt.")
+                # Restore original dropout probabilities on the fmt_model's opt object
+                float_fmt_model.opt.audio_dropout_prob = original_dropout_probs["audio"]
+                float_fmt_model.opt.ref_dropout_prob = original_dropout_probs["ref"]
+                float_fmt_model.opt.emotion_dropout_prob = original_dropout_probs["emotion"]
+                logger.debug("Restored original dropout probabilities on FMT model's opt.")
 
-            return (r_d_latents_cpu, float_fmt_model)  # Pass through the model
+                return (r_d_latents_cpu, float_fmt_model)  # Pass through the model
 
-        except Exception as e:  # Catch any exception from the loop
-            # Restore dropout probabilities in case of error too
-            float_fmt_model.opt.audio_dropout_prob = original_dropout_probs["audio"]
-            float_fmt_model.opt.ref_dropout_prob = original_dropout_probs["ref"]
-            float_fmt_model.opt.emotion_dropout_prob = original_dropout_probs["emotion"]
-            logger.error(f"Error during VA ODE sampling: {e}")
-            raise
-
-        finally:
-            float_fmt_model.to(mm.unet_offload_device())
+            except Exception as e:  # Catch any exception from the loop
+                # Restore dropout probabilities in case of error too
+                float_fmt_model.opt.audio_dropout_prob = original_dropout_probs["audio"]
+                float_fmt_model.opt.ref_dropout_prob = original_dropout_probs["ref"]
+                float_fmt_model.opt.emotion_dropout_prob = original_dropout_probs["emotion"]
+                logger.error(f"Error during VA ODE sampling: {e}")
+                raise

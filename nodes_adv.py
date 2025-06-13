@@ -20,7 +20,7 @@ import comfy.utils
 
 from .options.base_options import BaseOptions
 from .utils.image import img_tensor_2_np_array, process_img
-from .utils.torch import manage_cudnn_benchmark
+from .utils.torch import manage_cudnn_benchmark, model_to_target
 from .utils.misc import EMOTIONS, NODES_NAME, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .generate import InferenceAgent
 from .models.float.FMT import FlowMatchingTransformer
@@ -529,10 +529,8 @@ def _perform_ode_sampling_loop(
         e_cfg_scale: float,
 
         # Noise generation parameters
-        noise_seed_generator: torch.Generator,  # Pre-configured torch.Generator or None
-
-        # Misc
-        cudnn_benchmark_enabled: bool) -> torch.Tensor:
+        # Pre-configured torch.Generator or None
+        noise_seed_generator: torch.Generator) -> torch.Tensor:
     """
     Performs the core ODE-based sampling loop for generating r_d latents.
     Returns r_d_latents on the target_device.
@@ -559,69 +557,67 @@ def _perform_ode_sampling_loop(
     comfy_pbar = comfy.utils.ProgressBar(total_num_chunks)
     # logger.info(f"ODE sampling loop: {batch_size} item(s), {total_num_chunks} chunks.") # Logging can be done by caller
 
-    with manage_cudnn_benchmark(cudnn_benchmark_enabled, target_device):  # Pass device to CUDNN manager
-        # fmt_model is assumed to be already on target_device by the caller
-        fmt_model.eval()  # Ensure eval mode
+    # fmt_model is assumed to be already on target_device by the caller
 
-        for chunk_idx in range(total_num_chunks):
-            x0_chunk_batch = torch.randn(batch_size, model_num_frames_for_clip, model_dim_w,
-                                         device=target_device, generator=noise_seed_generator)
+    for chunk_idx in range(total_num_chunks):
+        x0_chunk_batch = torch.randn(batch_size, model_num_frames_for_clip, model_dim_w,
+                                     device=target_device, generator=noise_seed_generator)
 
-            start_idx = chunk_idx * model_num_frames_for_clip
-            end_idx = (chunk_idx + 1) * model_num_frames_for_clip
-            wa_chunk_batch = wa_latent_dev[:, start_idx:end_idx, :]
+        start_idx = chunk_idx * model_num_frames_for_clip
+        end_idx = (chunk_idx + 1) * model_num_frames_for_clip
+        wa_chunk_batch = wa_latent_dev[:, start_idx:end_idx, :]
 
-            current_chunk_len = wa_chunk_batch.shape[1]
-            if current_chunk_len < model_num_frames_for_clip:
-                padding_size = model_num_frames_for_clip - current_chunk_len
-                wa_chunk_batch = F.pad(wa_chunk_batch, (0, 0, 0, padding_size), mode='replicate')
+        current_chunk_len = wa_chunk_batch.shape[1]
+        if current_chunk_len < model_num_frames_for_clip:
+            padding_size = model_num_frames_for_clip - current_chunk_len
+            wa_chunk_batch = F.pad(wa_chunk_batch, (0, 0, 0, padding_size), mode='replicate')
 
-            def fmt_ode_func_batch(t_scalar, current_x_batch):
-                # Ensure t_scalar is correctly shaped for fmt.forward_with_cfv
-                # (which expects a scalar or a (B,) tensor for its 't' arg, then unsqueezes)
-                t_for_fmt = t_scalar
-                if t_scalar.ndim == 0:  # If scalar
-                    t_for_fmt = t_scalar.unsqueeze(0)
-                elif t_scalar.ndim == 1 and t_scalar.shape[0] == 1:  # If (1,)
-                    pass  # Already fine
-                else:
-                    # This case should generally not be hit by torchdiffeq.odeint with fixed steps
-                    raise ValueError(f"Unexpected time tensor shape from odeint: {t_scalar.shape}")
+        def fmt_ode_func_batch(t_scalar, current_x_batch):
+            # Ensure t_scalar is correctly shaped for fmt.forward_with_cfv
+            # (which expects a scalar or a (B,) tensor for its 't' arg, then unsqueezes)
+            t_for_fmt = t_scalar
+            if t_scalar.ndim == 0:  # If scalar
+                t_for_fmt = t_scalar.unsqueeze(0)
+            elif t_scalar.ndim == 1 and t_scalar.shape[0] == 1:  # If (1,)
+                pass  # Already fine
+            else:
+                # This case should generally not be hit by torchdiffeq.odeint with fixed steps
+                raise ValueError(f"Unexpected time tensor shape from odeint: {t_scalar.shape}")
 
-                output_combined_batch = fmt_model.forward_with_cfv(
-                    t=t_for_fmt,
-                    x=current_x_batch,
-                    wa=wa_chunk_batch,
-                    wr=r_s_latent_dev,
-                    we=we_latent_dev,
-                    prev_x=prev_x_batch,
-                    prev_wa=prev_wa_batch,
-                    a_cfg_scale=a_cfg_scale,
-                    r_cfg_scale=r_cfg_scale,
-                    e_cfg_scale=e_cfg_scale
-                )
-                # fmt.forward_with_cfv returns combined (prev+current), so slice:
-                return output_combined_batch[:, model_num_prev_frames:, :]
+            output_combined_batch = fmt_model.forward_with_cfv(
+                t=t_for_fmt,
+                x=current_x_batch,
+                wa=wa_chunk_batch,
+                wr=r_s_latent_dev,
+                we=we_latent_dev,
+                prev_x=prev_x_batch,
+                prev_wa=prev_wa_batch,
+                a_cfg_scale=a_cfg_scale,
+                r_cfg_scale=r_cfg_scale,
+                e_cfg_scale=e_cfg_scale
+            )
+            # fmt.forward_with_cfv returns combined (prev+current), so slice:
+            return output_combined_batch[:, model_num_prev_frames:, :]
 
-            trajectory_batch = odeint(fmt_ode_func_batch, x0_chunk_batch, time_linspace, **current_odeint_kwargs)
-            current_sample_output_batch = trajectory_batch[-1]
-            sampled_chunks_list.append(current_sample_output_batch)
+        trajectory_batch = odeint(fmt_ode_func_batch, x0_chunk_batch, time_linspace, **current_odeint_kwargs)
+        current_sample_output_batch = trajectory_batch[-1]
+        sampled_chunks_list.append(current_sample_output_batch)
 
-            # Update prev_x_batch and prev_wa_batch for the next iteration
-            if current_sample_output_batch.shape[1] >= model_num_prev_frames:
-                prev_x_batch = current_sample_output_batch[:, -model_num_prev_frames:, :]
-            else:  # Should not happen if model_num_prev_frames <= model_num_frames_for_clip
-                prev_x_batch = F.pad(current_sample_output_batch, (0, 0, 0, model_num_prev_frames -
-                                     current_sample_output_batch.shape[1]),
-                                     mode='replicate')[:, -model_num_prev_frames:, :]
+        # Update prev_x_batch and prev_wa_batch for the next iteration
+        if current_sample_output_batch.shape[1] >= model_num_prev_frames:
+            prev_x_batch = current_sample_output_batch[:, -model_num_prev_frames:, :]
+        else:  # Should not happen if model_num_prev_frames <= model_num_frames_for_clip
+            prev_x_batch = F.pad(current_sample_output_batch, (0, 0, 0, model_num_prev_frames -
+                                 current_sample_output_batch.shape[1]),
+                                 mode='replicate')[:, -model_num_prev_frames:, :]
 
-            if wa_chunk_batch.shape[1] >= model_num_prev_frames:
-                prev_wa_batch = wa_chunk_batch[:, -model_num_prev_frames:, :]
-            else:  # Should not happen
-                prev_wa_batch = F.pad(wa_chunk_batch, (0, 0, 0, model_num_prev_frames - wa_chunk_batch.shape[1]),
-                                      mode='replicate')[:, -model_num_prev_frames:, :]
+        if wa_chunk_batch.shape[1] >= model_num_prev_frames:
+            prev_wa_batch = wa_chunk_batch[:, -model_num_prev_frames:, :]
+        else:  # Should not happen
+            prev_wa_batch = F.pad(wa_chunk_batch, (0, 0, 0, model_num_prev_frames - wa_chunk_batch.shape[1]),
+                                  mode='replicate')[:, -model_num_prev_frames:, :]
 
-            comfy_pbar.update(1)  # Update progress bar
+        comfy_pbar.update(1)  # Update progress bar
 
     r_d_latents_full_gpu = torch.cat(sampled_chunks_list, dim=1)
     # Trim to the exact audio_num_frames length
@@ -722,15 +718,14 @@ class FloatSampleMotionSequenceRD:
                              "Global RNG will be used by randn if generator is None.")
                 # torch.randn with generator=None uses global RNG.
 
-        # Ensure FMT model is on the correct device before calling helper
-        fmt_model_to_use.to(target_device_for_sampling)
         # Ensure input latents are on the correct device
         r_s_latent_dev = r_s_latent.to(target_device_for_sampling)
         wa_latent_dev = wa_latent.to(target_device_for_sampling)
         we_latent_dev = we_latent.to(target_device_for_sampling)
 
         logger.info(f"Calling ODE sampling loop for {batch_size} item(s).")
-        try:
+        fmt_model_to_use.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled  # Pass this for the helper's context manager
+        with model_to_target(fmt_model_to_use):
             r_d_latents_gpu = _perform_ode_sampling_loop(
                 fmt_model=fmt_model_to_use,
                 r_s_latent_dev=r_s_latent_dev,
@@ -749,14 +744,10 @@ class FloatSampleMotionSequenceRD:
                 r_cfg_scale=r_cfg_scale_from_opt,  # Using value from opt
                 e_cfg_scale=e_cfg_scale,
                 noise_seed_generator=noise_gen,
-                cudnn_benchmark_enabled=opt.cudnn_benchmark_enabled  # Pass this for the helper's context manager
             )
             r_d_latents_cpu = r_d_latents_gpu.cpu()
 
             return (r_d_latents_cpu, float_pipe)
-
-        finally:
-            agent.G.fmt.to(mm.unet_offload_device())
 
 
 class FloatDecodeLatentsToImages:
