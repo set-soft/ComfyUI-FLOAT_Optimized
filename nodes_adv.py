@@ -15,12 +15,11 @@ from torchdiffeq import odeint
 # from tqdm import tqdm
 from typing import List, Dict  # , NewType
 # ComfyUI
-import comfy.model_management as mm
 import comfy.utils
 
 from .options.base_options import BaseOptions
 from .utils.image import img_tensor_2_np_array, process_img
-from .utils.torch import manage_cudnn_benchmark, model_to_target
+from .utils.torch import model_to_target
 from .utils.misc import EMOTIONS, NODES_NAME, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .generate import InferenceAgent
 from .models.float.FMT import FlowMatchingTransformer
@@ -229,10 +228,10 @@ class FloatEncodeImageToLatents:
         local_comfy_pbar = None
         original_agent_pbar_ref = None
 
-        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
+        agent.G.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
+        agent.G.target_device = opt.rank
+        with model_to_target(agent.G):
             try:
-                agent.G.to(opt.rank)
-
                 # --- Progress Bar Handling for First Run of this specific component ---
                 if agent.G.first_run:
                     num_encoder_layers = len(agent.G.motion_autoencoder.enc.net_app.convs)
@@ -276,7 +275,6 @@ class FloatEncodeImageToLatents:
                         agent.G.pbar = original_agent_pbar_ref
                     elif hasattr(agent.G, 'pbar') and local_comfy_pbar is agent.G.pbar:
                         agent.G.pbar = None
-                agent.G.to(mm.unet_offload_device())
 
 
 class FloatGetIdentityReference:
@@ -313,24 +311,21 @@ class FloatGetIdentityReference:
             raise ValueError(f"Dimension 1 of 'r_s_lambda_latent' should be opt.dim_m ({opt.dim_m}), "
                              f"got {r_s_lambda_latent.shape[1]}.")
 
-        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
-            try:
-                agent.G.motion_autoencoder.dec.to(opt.rank)
-                r_s_lambda_dev = r_s_lambda_latent.to(opt.rank)
+        agent.G.motion_autoencoder.dec.target_device = opt.rank
+        agent.G.motion_autoencoder.dec.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
+        with model_to_target(agent.G.motion_autoencoder.dec):
+            r_s_lambda_dev = r_s_lambda_latent.to(opt.rank)
 
-                # --- Core Operation ---
-                # agent.G.motion_autoencoder.dec.direction() should handle a batch input for r_s_lambda.
-                # If r_s_lambda_dev is (B, dim_m), then r_s_latent should be (B, style_dim)
-                # where style_dim is derived from the weights of the Direction layer (512 in original code).
-                r_s_latent_batch_gpu = agent.G.motion_autoencoder.dec.direction(r_s_lambda_dev)
+            # --- Core Operation ---
+            # agent.G.motion_autoencoder.dec.direction() should handle a batch input for r_s_lambda.
+            # If r_s_lambda_dev is (B, dim_m), then r_s_latent should be (B, style_dim)
+            # where style_dim is derived from the weights of the Direction layer (512 in original code).
+            r_s_latent_batch_gpu = agent.G.motion_autoencoder.dec.direction(r_s_lambda_dev)
 
-                # --- Output Formatting ---
-                r_s_latent_batch_cpu = r_s_latent_batch_gpu.cpu()
+            # --- Output Formatting ---
+            r_s_latent_batch_cpu = r_s_latent_batch_gpu.cpu()
 
-                return (r_s_latent_batch_cpu, float_pipe)
-
-            finally:
-                agent.G.motion_autoencoder.dec.to(mm.unet_offload_device())
+            return (r_s_latent_batch_cpu, float_pipe)
 
 
 class FloatEncodeAudioToLatentWA:
@@ -409,26 +404,22 @@ class FloatEncodeAudioToLatentWA:
         # original_agent_opt_fps = opt.fps
         opt.fps = fps
 
-        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
-            try:
-                agent.G.audio_encoder.to(opt.rank)
-                audio_on_device = preprocessed_audio_batched_cpu.to(opt.rank)
+        agent.G.audio_encoder.target_device = opt.rank
+        agent.G.audio_encoder.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
+        with model_to_target(agent.G.audio_encoder):
+            audio_on_device = preprocessed_audio_batched_cpu.to(opt.rank)
 
-                # Calculate Number of Frames based on the now uniform num_samples_after_prep
-                audio_num_frames = math.ceil(num_samples_after_prep * opt.fps / opt.sampling_rate)
-                logger.info(f"Common audio_num_frames for batch: {audio_num_frames} (from {num_samples_after_prep} "
-                            f"processed audio samples, {opt.fps} video_fps, {opt.sampling_rate} audio_sr).")
+            # Calculate Number of Frames based on the now uniform num_samples_after_prep
+            audio_num_frames = math.ceil(num_samples_after_prep * opt.fps / opt.sampling_rate)
+            logger.info(f"Common audio_num_frames for batch: {audio_num_frames} (from {num_samples_after_prep} "
+                        f"processed audio samples, {opt.fps} video_fps, {opt.sampling_rate} audio_sr).")
 
-                # Output shape: (BatchSize, audio_num_frames, DimW)
-                wa_latent_gpu = agent.G.audio_encoder.inference(audio_on_device, seq_len=audio_num_frames)
+            # Output shape: (BatchSize, audio_num_frames, DimW)
+            wa_latent_gpu = agent.G.audio_encoder.inference(audio_on_device, seq_len=audio_num_frames)
 
-                wa_latent_cpu = wa_latent_gpu.cpu()
+            wa_latent_cpu = wa_latent_gpu.cpu()
 
-                return (wa_latent_cpu, audio_num_frames, preprocessed_audio_batched_cpu, float_pipe)
-
-            finally:
-                # opt.fps = original_agent_opt_fps
-                agent.G.audio_encoder.to(mm.unet_offload_device())
+            return (wa_latent_cpu, audio_num_frames, preprocessed_audio_batched_cpu, float_pipe)
 
 
 class FloatEncodeEmotionToLatentWE:
@@ -465,42 +456,39 @@ class FloatEncodeEmotionToLatentWE:
 
         batch_size = preprocessed_audio.shape[0]
 
-        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
-            try:
-                # emotion_encoder contains Wav2Vec2ForSpeechClassification model
-                agent.G.emotion_encoder.to(opt.rank)
-                audio_on_device = preprocessed_audio.to(opt.rank)
+        agent.G.emotion_encoder.target_device = opt.rank
+        agent.G.emotion_encoder.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
+        with model_to_target(agent.G.emotion_encoder):
+            # emotion_encoder contains Wav2Vec2ForSpeechClassification model
+            audio_on_device = preprocessed_audio.to(opt.rank)
 
-                device_for_one_hot = opt.rank  # Target device for one_hot tensor
+            device_for_one_hot = opt.rank  # Target device for one_hot tensor
 
-                emo_label_lower = str(emotion).lower()
-                emo_idx = agent.G.emotion_encoder.label2id.get(emo_label_lower, None)
+            emo_label_lower = str(emotion).lower()
+            emo_idx = agent.G.emotion_encoder.label2id.get(emo_label_lower, None)
 
-                we_latent_gpu = None
+            we_latent_gpu = None
 
-                if emo_idx is None or emo_label_lower == "none":
-                    logger.info("Predicting emotion from audio batch.")
-                    # predict_emotion expects (B, NumSamples) and returns (B, NumClasses)
-                    # It calls self.wav2vec2_for_emotion.forward(a).logits
-                    # and then F.softmax(logits, dim=1)
-                    # Wav2Vec2ForSpeechClassification.forward should handle batch input.
-                    predicted_scores_batch = agent.G.emotion_encoder.predict_emotion(audio_on_device)  # (B, NumClasses)
-                    we_latent_gpu = predicted_scores_batch.unsqueeze(1)  # (B, 1, NumClasses)
-                else:
-                    logger.info(f"Using specified emotion: {emotion} for batch size {batch_size}.")
-                    # Create a one-hot tensor for the specified emotion
-                    one_hot_single = F.one_hot(torch.tensor(emo_idx, device=device_for_one_hot),
-                                               num_classes=opt.dim_e).float()  # (NumClasses)
-                    # Repeat for batch and add sequence dimension
-                    we_latent_gpu = one_hot_single.unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1)  # (B, 1, NumClasses)
+            if emo_idx is None or emo_label_lower == "none":
+                logger.info("Predicting emotion from audio batch.")
+                # predict_emotion expects (B, NumSamples) and returns (B, NumClasses)
+                # It calls self.wav2vec2_for_emotion.forward(a).logits
+                # and then F.softmax(logits, dim=1)
+                # Wav2Vec2ForSpeechClassification.forward should handle batch input.
+                predicted_scores_batch = agent.G.emotion_encoder.predict_emotion(audio_on_device)  # (B, NumClasses)
+                we_latent_gpu = predicted_scores_batch.unsqueeze(1)  # (B, 1, NumClasses)
+            else:
+                logger.info(f"Using specified emotion: {emotion} for batch size {batch_size}.")
+                # Create a one-hot tensor for the specified emotion
+                one_hot_single = F.one_hot(torch.tensor(emo_idx, device=device_for_one_hot),
+                                           num_classes=opt.dim_e).float()  # (NumClasses)
+                # Repeat for batch and add sequence dimension
+                we_latent_gpu = one_hot_single.unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1)  # (B, 1, NumClasses)
 
-                # --- Output Formatting ---
-                we_latent_cpu = we_latent_gpu.cpu()
+            # --- Output Formatting ---
+            we_latent_cpu = we_latent_gpu.cpu()
 
-                return (we_latent_cpu, float_pipe)
-
-            finally:
-                agent.G.emotion_encoder.to(mm.unet_offload_device())
+            return (we_latent_cpu, float_pipe)
 
 
 # This helper function encapsulates the core ODE sampling loop
@@ -725,6 +713,7 @@ class FloatSampleMotionSequenceRD:
 
         logger.info(f"Calling ODE sampling loop for {batch_size} item(s).")
         fmt_model_to_use.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled  # Pass this for the helper's context manager
+        fmt_model_to_use.target_device = target_device_for_sampling
         with model_to_target(fmt_model_to_use):
             r_d_latents_gpu = _perform_ode_sampling_loop(
                 fmt_model=fmt_model_to_use,
@@ -812,10 +801,10 @@ class FloatDecodeLatentsToImages:
             original_agent_pbar_ref = agent.G.pbar
         agent.G.pbar = comfy_pbar_decode
 
-        with manage_cudnn_benchmark(opt.cudnn_benchmark_enabled, opt.rank):
+        agent.G.motion_autoencoder.dec.target_device = opt.rank
+        agent.G.motion_autoencoder.dec.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
+        with model_to_target(agent.G.motion_autoencoder.dec):
             try:
-                agent.G.motion_autoencoder.dec.to(opt.rank)
-
                 s_r_dev = s_r_latent.to(opt.rank)
                 s_r_feats_dev_list = [feat.to(opt.rank) for feat in s_r_feats_dict["value"]]
                 r_d_dev = r_d_latents.to(opt.rank)
@@ -853,5 +842,3 @@ class FloatDecodeLatentsToImages:
                     agent.G.pbar = original_agent_pbar_ref
                 elif hasattr(agent.G, 'pbar') and comfy_pbar_decode is agent.G.pbar:
                     agent.G.pbar = None
-
-                agent.G.motion_autoencoder.dec.to(mm.unet_offload_device())
