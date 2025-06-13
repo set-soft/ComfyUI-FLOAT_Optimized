@@ -12,7 +12,7 @@ import folder_paths
 
 from .options.base_options import BaseOptions
 from .utils.logger import main_logger
-from .utils.torch import get_torch_device_options
+from .utils.torch import get_torch_device_options, model_to_target
 from .generate import InferenceAgent
 
 EMOTIONS = ['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
@@ -162,20 +162,9 @@ class FloatProcess:
 
     def floatprocess(self, ref_image, ref_audio, float_pipe, a_cfg_scale, e_cfg_scale, fps, emotion, face_align, seed):
 
-        original_cudnn_benchmark_state = None
-        is_cuda_device = float_pipe.opt.rank.type == 'cuda'
-
-        try:
-            if is_cuda_device and hasattr(torch.backends, 'cudnn') and torch.backends.cudnn.is_available():
-                # Store original state and set new state
-                original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
-                torch.backends.cudnn.benchmark = float_pipe.opt.cudnn_benchmark_enabled
-                main_logger.debug(f"FloatProcess: Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}"
-                                  f" (was {original_cudnn_benchmark_state})")
-            else:
-                main_logger.debug("FloatProcess: Not a CUDA device or cuDNN not available, benchmark setting skipped.")
-
-            float_pipe.G.to(float_pipe.rank)
+        float_pipe.G.target_device = float_pipe.rank
+        float_pipe.G.cudnn_benchmark_setting = float_pipe.opt.cudnn_benchmark_enabled
+        with model_to_target(float_pipe.G):
             # original_fps = float_pipe.opt.fps
             float_pipe.opt.fps = fps
 
@@ -223,11 +212,3 @@ class FloatProcess:
                 output_audio_dict = {'waveform': final_concatenated_audio_wf, 'sample_rate': audio_sample_rate}
 
             return (torch.cat(all_generated_images, dim=0), output_audio_dict, fps,)
-        finally:
-            # Restore original cuDNN benchmark state
-            if original_cudnn_benchmark_state is not None:
-                torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
-                main_logger.debug(f"FloatProcess: Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
-
-            # float_pipe.opt.fps = original_fps
-            float_pipe.G.to(mm.unet_offload_device())
