@@ -24,27 +24,8 @@ def get_torch_device_options():
 
 
 # ##################################################################################
-# # Helper for cuDNN Benchmark
+# # Helper for inference (Target device, offload, eval, no_grad and cuDNN Benchmark)
 # ##################################################################################
-
-@contextlib.contextmanager
-def manage_cudnn_benchmark(cudnn_enabled_flag: bool, device: torch.device):
-    """ Context manager to temporarily set and restore cudnn.benchmark state. """
-    original_cudnn_benchmark_state = None
-    is_cuda_device = device.type == 'cuda'
-
-    if is_cuda_device and hasattr(torch.backends, 'cudnn') and torch.backends.cudnn.is_available():
-        original_cudnn_benchmark_state = torch.backends.cudnn.benchmark
-        if torch.backends.cudnn.benchmark != cudnn_enabled_flag:
-            torch.backends.cudnn.benchmark = cudnn_enabled_flag
-            logger.debug(f"Temporarily set cuDNN benchmark to {torch.backends.cudnn.benchmark}")
-    try:
-        yield
-    finally:
-        if original_cudnn_benchmark_state is not None:
-            torch.backends.cudnn.benchmark = original_cudnn_benchmark_state
-            logger.debug(f"Restored cuDNN benchmark to {torch.backends.cudnn.benchmark}")
-
 
 @contextlib.contextmanager
 def model_to_target(model: torch.nn.Module):
