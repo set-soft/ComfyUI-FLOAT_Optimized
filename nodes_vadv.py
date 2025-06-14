@@ -36,10 +36,19 @@ class FloatAudioPreprocessAndFeatureExtract:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "audio": ("AUDIO",),  # Expects pre-processed mono audio at correct SR
-                "wav2vec_pipe": ("WAV2VEC_PIPE",),  # (model, feature_extractor)
-                "target_fps": ("FLOAT", {"default": 25.0, "min": 1.0, "step": 0.1}),
-                "only_last_features": ("BOOLEAN", {"default": False}),
+                "audio": ("AUDIO", {  # Expects pre-processed mono audio at correct SR
+                    "tooltip": "The raw ComfyUI audio input. Must be mono and have the correct sample rate required by "
+                    "the Wav2Vec pipe."}),
+                "wav2vec_pipe": ("WAV2VEC_PIPE", {  # (model, feature_extractor)
+                    "tooltip": "The loaded Wav2Vec pipe, containing the model, feature extractor, and options."}),
+                "target_fps": ("FLOAT", {
+                    "default": 25.0, "min": 1.0, "step": 0.1,
+                    "tooltip": "The target video frames-per-second. Used to calculate the final number of feature frames."}),
+                "only_last_features": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": ("If True, use only the features from the last transformer layer. "
+                                "If False, concatenate features from all transformer layers, resulting in a much larger "
+                                "feature dimension.")}),
             }
         }
 
@@ -144,8 +153,10 @@ class FloatApplyAudioProjection:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "wav2vec_features": ("TORCH_TENSOR",),  # (B, NumFrames, D_feature_for_projection)
-                "projection_layer": ("AUDIO_PROJECTION_LAYER",),  # The nn.Module from LoadAudioProjectionLayer
+                "wav2vec_features": ("TORCH_TENSOR", {  # (B, NumFrames, D_feature_for_projection)
+                    "tooltip": "The batch of interpolated feature tensors output by the Wav2Vec feature extraction node."}),
+                "projection_layer": ("AUDIO_PROJECTION_LAYER", {  # The nn.Module from LoadAudioProjectionLayer
+                    "tooltip": "The loaded audio projection layer module."}),
             }
         }
 
@@ -197,9 +208,15 @@ class FloatExtractEmotionWithCustomModel:
         emotion_options = EMOTIONS
         return {
             "required": {
-                "processed_audio_features": ("TORCH_TENSOR",),  # (B, NumSamplesAfterPrep) from a Wav2Vec2FeatureExtractor
-                "emotion_model_pipe": ("EMOTION_MODEL_PIPE",),   # (emotion_model, fe_for_emo_model_ref_only, config)
-                "emotion": (emotion_options, {"default": "none"}),
+                "processed_audio_features": ("TORCH_TENSOR", {  # (B, NumSamplesAfterPrep) from a Wav2Vec2FeatureExtractor
+                    "tooltip": "The batch of preprocessed audio features, output by a feature extractor like the one in "
+                    "FloatAudioPreprocessAndFeatureExtract."}),
+                "emotion_model_pipe": ("EMOTION_MODEL_PIPE", {  # (emotion_model, fe_for_emo_model_ref_only, config)
+                    "tooltip": "The loaded emotion recognition model pipe."}),
+                "emotion": (emotion_options, {
+                    "default": "none",
+                    "tooltip": "Select a specific emotion or 'none' to have the model predict the emotion from the "
+                    "audio features."}),
             }
         }
 
@@ -288,13 +305,14 @@ class ApplyFloatEncoder:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "ref_image": ("IMAGE",),
-                "float_encoder": ("FLOAT_ENCODER_MODEL",),
+                "ref_image": ("IMAGE", {
+                    "tooltip": "A batch of reference images, correctly sized (e.g., 512x512) for the encoder."}),
+                "float_encoder": ("FLOAT_ENCODER_MODEL", {"tooltip": "The loaded FLOAT Encoder model module."}),
             }
         }
 
     RETURN_TYPES = ("FLOAT_APPEARANCE_PIPE", "TORCH_TENSOR", "FLOAT_ENCODER_MODEL")
-    RETURN_NAMES = ("appearance_pipe (wS→r)", "r_s_lambda_latent", "float_encoder_out")
+    RETURN_NAMES = ("appearance_pipe (Ws→r)", "r_s_lambda_latent", "float_encoder_out")
     FUNCTION = "apply_encoder"
 
     def apply_encoder(self, ref_image: torch.Tensor, float_encoder: FloatEncoderModule):
@@ -359,9 +377,13 @@ class ApplyFloatSynthesis:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "appearance_pipe": ("FLOAT_APPEARANCE_PIPE",),
-                "float_synthesis": ("FLOAT_SYNTHESIS_MODEL",),
-                "r_d_latents": ("TORCH_TENSOR",),
+                "appearance_pipe": ("FLOAT_APPEARANCE_PIPE", {
+                    "tooltip": "The bundled appearance information (s_r latent and feature maps) from the ApplyFloatEncoder "
+                    "node. (Ws→r)"}),
+                "float_synthesis": ("FLOAT_SYNTHESIS_MODEL", {
+                    "tooltip": "The loaded FLOAT Synthesis (Decoder) model module."}),
+                "r_d_latents": ("TORCH_TENSOR", {
+                    "tooltip": "The driven motion latent sequence generated by the FMT sampler. (Wr→D)"}),
             }
         }
 
@@ -457,13 +479,16 @@ class FloatGetIdentityReferenceVA:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "r_s_lambda_latent": ("TORCH_TENSOR",),         # (B, inferred_motion_dim)
-                "float_synthesis": ("FLOAT_SYNTHESIS_MODEL",),  # Loaded Synthesis module
+                "r_s_lambda_latent": ("TORCH_TENSOR", {  # (B, inferred_motion_dim)
+                    "tooltip": "The motion control parameters (h_motion) output by the FLOAT Encoder."}),
+                "float_synthesis": ("FLOAT_SYNTHESIS_MODEL", {  # Loaded Synthesis module
+                    "tooltip": "The loaded FLOAT Synthesis (Decoder) model, which contains the 'direction' module needed for "
+                    "this transformation."}),
             }
         }
 
     RETURN_TYPES = ("FLOAT_SYNTHESIS_MODEL", "TORCH_TENSOR")
-    RETURN_NAMES = ("float_synthesis_out", "r_s_latent")
+    RETURN_NAMES = ("float_synthesis_out", "r_s_latent (Wr→s)")
     FUNCTION = "get_identity_reference_batch"
     CATEGORY = BASE_CATEGORY
     DESCRIPTION = ("Derives the identity-specific motion reference latent (r_s) from the motion control parameters "
@@ -518,39 +543,70 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
         base_opts = BaseOptions()
         return {
             "required": {
-                "r_s_latent": ("TORCH_TENSOR",),
-                "wa_latent": ("TORCH_TENSOR",),
-                "audio_num_frames": ("INT", {"forceInput": True}),
-                "we_latent": ("TORCH_TENSOR",),
-                "float_fmt_model": ("FLOAT_FMT_MODEL",),  # From LoadFMTModel
+                "r_s_latent": ("TORCH_TENSOR", {
+                    "tooltip": "The reference identity latent (wr), derived from the source image. Wr→s"}),
+                "wa_latent": ("TORCH_TENSOR", {
+                     "tooltip": "The audio conditioning latent (wa), derived from the audio features."}),
+                "audio_num_frames": ("INT", {
+                    "forceInput": True,
+                    "tooltip": "Total number of frames to generate, determined by the audio length and target FPS."}),
+                "we_latent": ("TORCH_TENSOR", {
+                     "tooltip": "The emotion conditioning latent (we), derived from emotion prediction or specification."}),
+                "float_fmt_model": ("FLOAT_FMT_MODEL", {
+                     "tooltip": "The loaded FlowMatchingTransformer model from a loader node."}),  # From LoadFMTModel
 
                 # CFG Scales
-                "a_cfg_scale": ("FLOAT", {"default": base_opts.a_cfg_scale, "min": 0.0, "max": 10.0, "step": 0.1}),
-                "r_cfg_scale": ("FLOAT", {"default": base_opts.r_cfg_scale, "min": 0.0, "max": 10.0, "step": 0.1}),
-                "e_cfg_scale": ("FLOAT", {"default": base_opts.e_cfg_scale, "min": 0.0, "max": 10.0, "step": 0.1}),
+                "a_cfg_scale": ("FLOAT", {
+                    "default": base_opts.a_cfg_scale, "min": 0.0, "max": 10.0, "step": 0.1,
+                    "tooltip": "Audio Guidance Scale. Higher values make the motion follow the audio more strictly."}),
+                "r_cfg_scale": ("FLOAT", {
+                    "default": base_opts.r_cfg_scale, "min": 0.0, "max": 10.0, "step": 0.1,
+                    "tooltip": "Reference Identity Guidance Scale. (Note: Currently unused in the default FMT "
+                               "implementation)."}),
+                "e_cfg_scale": ("FLOAT", {
+                    "default": base_opts.e_cfg_scale, "min": 0.0, "max": 10.0, "step": 0.1,
+                    "tooltip": "Emotion Guidance Scale. Higher values make the motion express the target emotion "
+                               "more strongly."}),
 
                 # ODE Parameters
-                "nfe": ("INT", {"default": base_opts.nfe, "min": 1, "max": 1000}),
-                "torchdiffeq_ode_method": (TORCHDIFFEQ_FIXED_STEP_SOLVERS, {"default": base_opts.torchdiffeq_ode_method}),
-                "ode_atol": ("FLOAT", {"default": base_opts.ode_atol, "min": 1e-9, "max": 1e-1, "step": 1e-6, "precision": 9}),
-                "ode_rtol": ("FLOAT", {"default": base_opts.ode_rtol, "min": 1e-9, "max": 1e-1, "step": 1e-6, "precision": 9}),
+                "nfe": ("INT", {
+                    "default": base_opts.nfe, "min": 1, "max": 1000,
+                    "tooltip": "Number of Function Evaluations for the ODE solver. Higher values increase quality and "
+                               "generation time."}),
+                "torchdiffeq_ode_method": (TORCHDIFFEQ_FIXED_STEP_SOLVERS, {
+                    "default": base_opts.torchdiffeq_ode_method,
+                    "tooltip": "The specific fixed-step numerical integration method for the ODE solver."}),
+                "ode_atol": ("FLOAT", {
+                    "default": base_opts.ode_atol, "min": 1e-9, "max": 1e-1, "step": 1e-6, "precision": 9,
+                    "tooltip": "Absolute tolerance for the ODE solver. Controls precision."}),
+                "ode_rtol": ("FLOAT", {
+                    "default": base_opts.ode_rtol, "min": 1e-9, "max": 1e-1, "step": 1e-6, "precision": 9,
+                    "tooltip": "Relative tolerance for the ODE solver. Controls precision."}),
 
                 # Dropout Probabilities
-                "audio_dropout_prob": ("FLOAT", {"default": base_opts.audio_dropout_prob, "min": 0.0, "max": 1.0,
-                                       "step": 0.01}),
-                "ref_dropout_prob": ("FLOAT", {"default": base_opts.ref_dropout_prob, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "emotion_dropout_prob": ("FLOAT", {"default": base_opts.emotion_dropout_prob, "min": 0.0, "max": 1.0,
-                                         "step": 0.01}),
+                "audio_dropout_prob": ("FLOAT", {
+                    "default": base_opts.audio_dropout_prob, "min": 0.0, "max": 1.0, "step": 0.01,
+                    "tooltip": "Dropout probability for the audio condition during sampling. Set > 0 for variation."}),
+                "ref_dropout_prob": ("FLOAT", {
+                    "default": base_opts.ref_dropout_prob, "min": 0.0, "max": 1.0, "step": 0.01,
+                    "tooltip": "Dropout probability for the reference condition during sampling. Set > 0 for variation."}),
+                "emotion_dropout_prob": ("FLOAT", {
+                    "default": base_opts.emotion_dropout_prob, "min": 0.0, "max": 1.0, "step": 0.01,
+                    "tooltip": "Dropout probability for the emotion condition during sampling. Set > 0 for variation."}),
 
                 # Seed Control
-                "fix_noise_seed": ("BOOLEAN", {"default": base_opts.fix_noise_seed}),
-                "seed": ("INT", {"default": base_opts.seed, "min": 0, "max": 0xffffffffffffffff}),
-                # cudnn_benchmark is on the fmt_model instance now
+                "fix_noise_seed": ("BOOLEAN", {
+                    "default": base_opts.fix_noise_seed,
+                    "tooltip": "If true, the 'seed' input will be used to generate reproducible noise. "
+                    "If false, behavior depends on the seed value."}),
+                "seed": ("INT", {
+                    "default": base_opts.seed, "min": 0, "max": 0xffffffffffffffff,
+                    "tooltip": "The seed for the random noise generator used by the ODE sampler."}),
             }
         }
 
     RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_FMT_MODEL")  # Pass through model
-    RETURN_NAMES = ("r_d_latents", "float_fmt_model_out")
+    RETURN_NAMES = ("r_d_latents (Wr→D)", "float_fmt_model_out")
     FUNCTION = "sample_rd_sequence_va"
 
     def sample_rd_sequence_va(self, r_s_latent: torch.Tensor, wa_latent: torch.Tensor,
