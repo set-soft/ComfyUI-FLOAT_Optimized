@@ -396,8 +396,8 @@ class LoadFloatEncoderModel:
         }
 
     # Outputting inferred dimensions for user information / optional wiring
-    RETURN_TYPES = ("FLOAT_ENCODER_MODEL", "INT", "INT", "INT")
-    RETURN_NAMES = ("float_encoder", "inferred_input_size", "dim_w", "dim_m")
+    RETURN_TYPES = ("INT", "INT", "INT", "FLOAT_ENCODER_MODEL")
+    RETURN_NAMES = ("inferred_input_size", "dim_w", "dim_m", "float_encoder")
     FUNCTION = "load_encoder_infer_arch"
 
     def load_encoder_infer_arch(self, encoder_file: str, target_device: str, cudnn_benchmark: bool):
@@ -486,7 +486,7 @@ class LoadFloatEncoderModel:
         encoder_model.target_device = torch.device(target_device)
         logger.info(f"FLOAT Encoder (inferred arch) loaded to {target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
 
-        return (encoder_model, inferred_input_size, dim_w, dim_m)
+        return (inferred_input_size, dim_w, dim_m, encoder_model)
 
 
 class LoadFloatSynthesisModel:
