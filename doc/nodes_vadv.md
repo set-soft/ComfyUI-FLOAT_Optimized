@@ -179,7 +179,24 @@ These nodes perform computations using the models loaded by the loader nodes.
 - **Display Name:** Sample Motion Sequence RD (VA)
 - **Description:** The core sampling node. It uses the loaded Flow Matching Transformer (FMT) and an ODE solver to generate the driven motion latent sequence (`r_d`). It takes all conditioning latents (`r_s`, `wa`, `we`) and provides explicit user control over CFG scales, ODE parameters, and noise generation.
 - **Inputs:**
-  - *(Numerous inputs for latents, FMT model, and all CFG/ODE/Seed/Dropout parameters)*
+  - **`float_fmt_model`** (FLOAT\_FMT\_MODEL): The loaded `FlowMatchingTransformer` model module from a loader node.
+  - **`r_s_latent`** (TORCH\_TENSOR): The reference identity latent (`wr`), derived from the source image. This provides the static identity/style conditioning.
+  - **`wa_latent`** (TORCH\_TENSOR): The audio conditioning latent (`wa`), derived from the audio features and projection. This drives the primary motion.
+  - **`we_latent`** (TORCH\_TENSOR): The emotion conditioning latent (`we`), derived from emotion prediction or specification.
+  - **`audio_num_frames`** (INT, *Link Only*): Total number of frames to generate, determined by the audio length and target FPS. Must be connected from an upstream node.
+  - **`a_cfg_scale`** (FLOAT): **Audio Guidance Scale.** Higher values (e.g., > 1.0) make the motion follow the audio more strictly.
+  - **`r_cfg_scale`** (FLOAT): **Reference Identity Guidance Scale.** Controls adherence to the identity. Requires `include_r_cfg` to be enabled.
+  - **`e_cfg_scale`** (FLOAT): **Emotion Guidance Scale.** Higher values make the motion express the target emotion more strongly.
+  - **`include_r_cfg`** (BOOLEAN): **(Experimental)** If True, enables guidance on the reference identity using `r_cfg_scale`. This requires more computation (4 forward passes instead of 3).
+  - **`nfe`** (INT): **Number of Function Evaluations.** The number of steps for the ODE solver. Higher values can increase quality and detail at the cost of longer generation time.
+  - **`torchdiffeq_ode_method`** (Dropdown): The specific fixed-step numerical integration method for the ODE solver (e.g., 'euler', 'midpoint', 'rk4').
+  - **`ode_atol`** (FLOAT): **Absolute Tolerance** for the ODE solver. A smaller value increases precision but can slow down computation.
+  - **`ode_rtol`** (FLOAT): **Relative Tolerance** for the ODE solver. A smaller value increases precision but can slow down computation.
+  - **`audio_dropout_prob`** (FLOAT): Dropout probability for the audio condition during sampling. Setting > 0 can introduce variation and reduce overfitting to the audio.
+  - **`ref_dropout_prob`** (FLOAT): Dropout probability for the reference condition during sampling. Set > 0 for variation.
+  - **`emotion_dropout_prob`** (FLOAT): Dropout probability for the emotion condition during sampling. Set > 0 for variation.
+  - **`fix_noise_seed`** (BOOLEAN): If True, the `seed` input will be used to generate reproducible random noise for the sampling process.
+  - **`seed`** (INT): The seed for the random noise generator used by the ODE sampler.
 - **Outputs:**
   - `r_d_latents (Wr→D)`: (TORCH_TENSOR) The generated sequence of driven motion latents.
   - `float_fmt_model_out`: (FLOAT_FMT_MODEL) Passthrough of the input FMT model.
