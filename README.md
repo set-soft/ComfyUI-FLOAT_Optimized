@@ -21,7 +21,7 @@
 5. [Debugging](#-debugging)
 6. [Citation](#-citation-of-the-paper)
 7. [Attributions](#-attributions)
-8. [License](#-license)
+8. [License](#%EF%B8%8F-license)
 ---
 
 This project provides a ComfyUI wrapper of [FLOAT](https://github.com/deepbrainai-research/float) for Generative Motion Latent Flow Matching for Audio-driven Talking Portrait
