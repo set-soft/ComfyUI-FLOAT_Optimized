@@ -92,6 +92,16 @@ Three *models* are needed.
             [download 2](https://huggingface.co/yuvraj108c/float/resolve/main/float.pth?download=true)
     - License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
+#### Very Advanced
+
+In order to use the nodes labeled **VA** (Very Advanced) you need to download:
+
+1. The Wav2Vec 2.0 and Speech Emotion Recognition models described before (models/audio)
+2. The FLOAT individual parts found [here](https://huggingface.co/set-soft/float_advanced/tree/main)
+   Download the folders and copy them to `models/float` inside your ComfyUI installation.
+
+These nodes are the most flexible and they enable using various options to fine-tune the FLOAT behavior.
+Note that their input and outputs might change.
 
 ## &#128218; Nodes
 
