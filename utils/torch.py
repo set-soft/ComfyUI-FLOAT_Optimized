@@ -68,7 +68,7 @@ def model_to_target(model: torch.nn.Module):
 
         # 4. Move model to target device if not already there
         if original_device != target_device:
-            logger.debug(f"Moving model from {original_device} to target device {target_device} for inference.")
+            logger.debug(f"Moving model from `{original_device}` to target device `{target_device}` for inference.")
             model.to(target_device)
 
         # 5. Set to eval mode and disable gradients for the operation
@@ -87,7 +87,7 @@ def model_to_target(model: torch.nn.Module):
         offload_device = mm.unet_offload_device()
         current_device_after_yield = next(model.parameters()).device
         if current_device_after_yield != offload_device:
-            logger.debug(f"Offloading model from {current_device_after_yield} to offload device {offload_device}.")
+            logger.debug(f"Offloading model from `{current_device_after_yield}` to offload device `{offload_device}`.")
             model.to(offload_device)
             # Clear cache if we were on a CUDA device
             if 'cuda' in str(current_device_after_yield):
