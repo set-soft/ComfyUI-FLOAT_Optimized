@@ -28,6 +28,9 @@ SUFFIX = "(VA)"
 class FloatAudioPreprocessAndFeatureExtract:
     UNIQUE_NAME = "FloatAudioPreprocessAndFeatureExtract"
     DISPLAY_NAME = "FLOAT Audio Feature Extract"
+    DESCRIPTION = ("Processes a batch of pre-validated (mono, correct SR) audio. It applies the feature extractor from the "
+                   "loaded Wav2Vec pipe, runs the audio through the Wav2Vec model, and interpolates the resulting "
+                   "features to match the target video FPS, making them ready for projection.")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -133,6 +136,9 @@ class FloatAudioPreprocessAndFeatureExtract:
 class FloatApplyAudioProjection:
     UNIQUE_NAME = "FloatApplyAudioProjection"
     DISPLAY_NAME = "FLOAT Apply Audio Projection"
+    DESCRIPTION = ("Applies the loaded audio projection layer to the features extracted from the Wav2Vec model. "
+                   "This final step projects the high-dimensional audio features down to the motion latent space, "
+                   "producing the final audio conditioning tensor (wa_latent).")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -182,6 +188,9 @@ class FloatApplyAudioProjection:
 class FloatExtractEmotionWithCustomModel:
     UNIQUE_NAME = "FloatExtractEmotionWithCustomModel"
     DISPLAY_NAME = "FLOAT Extract Emotion from Features"
+    DESCRIPTION = ("Generates the emotion conditioning latent (we). If an emotion is specified, it creates a one-hot "
+                   "encoded tensor. If set to 'none', it predicts the emotion from the provided preprocessed audio "
+                   "features using the loaded custom emotion recognition model.")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -270,6 +279,9 @@ class FloatExtractEmotionWithCustomModel:
 class ApplyFloatEncoder:
     UNIQUE_NAME = "ApplyFloatEncoder"
     DISPLAY_NAME = "Apply FLOAT Encoder"
+    DESCRIPTION = ("Applies the loaded FLOAT Encoder to a batch of reference images. It preprocesses the images and passes "
+                   "them through the encoder to extract the core appearance latent (s_r), motion control parameters "
+                   "(r_s_lambda), and a dictionary of multi-scale feature maps (s_r_feats) for the decoder.")
     CATEGORY = BASE_CATEGORY
 
     @classmethod
@@ -336,6 +348,9 @@ class ApplyFloatEncoder:
 class ApplyFloatSynthesis:
     UNIQUE_NAME = "ApplyFloatSynthesis"
     DISPLAY_NAME = "Apply FLOAT Synthesis"
+    DESCRIPTION = ("The final image generation step. It takes the appearance latents (s_r, s_r_feats) and the driven motion "
+                   "sequence (r_d) and uses the loaded Synthesis/Decoder model to render the final animated "
+                   "image sequence frame by frame, handling the style-based modulated convolutions and flow warping.")
     CATEGORY = BASE_CATEGORY
 
     @classmethod
@@ -447,7 +462,10 @@ class FloatGetIdentityReferenceVA:
     RETURN_NAMES = ("float_synthesis_out", "r_s_latent")
     FUNCTION = "get_identity_reference_batch"
     CATEGORY = BASE_CATEGORY
-    DESCRIPTION = "Derives the batched identity reference latent (r_s) from r_s_lambda."
+    DESCRIPTION = ("Derives the identity-specific motion reference latent (r_s) from the motion control parameters "
+                   "(r_s_lambda). "
+                   "This node uses the `direction` module within the loaded Synthesis/Decoder model to perform "
+                   "the transformation, creating a key conditioning signal for the FMT sampler.")
     UNIQUE_NAME = "FloatGetIdentityReferenceVA"
     DISPLAY_NAME = "FLOAT Get Identity Reference"
 
@@ -486,6 +504,9 @@ class FloatGetIdentityReferenceVA:
 class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
     UNIQUE_NAME = "FloatSampleMotionSequenceRD_VA"
     DISPLAY_NAME = "Sample Motion Sequence RD"
+    DESCRIPTION = ("The core sampling node. It uses the loaded Flow Matching Transformer (FMT) and an ODE solver to generate "
+                   "the driven motion latent sequence (r_d). It takes all conditioning latents (r_s, wa, we) and "
+                   "provides explicit user control over CFG scales, ODE parameters, and noise generation.")
     CATEGORY = BASE_CATEGORY
 
     @classmethod
