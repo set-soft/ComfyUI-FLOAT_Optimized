@@ -567,6 +567,10 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
                     "default": base_opts.e_cfg_scale, "min": 0.0, "max": 10.0, "step": 0.1,
                     "tooltip": "Emotion Guidance Scale. Higher values make the motion express the target emotion "
                                "more strongly."}),
+                "include_r_cfg": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": ("Experimental! Try to include some control over the reference weight. "
+                                "When enabled the `r_cfg_scale` is used.")}),
 
                 # ODE Parameters
                 "nfe": ("INT", {
@@ -611,7 +615,7 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
 
     def sample_rd_sequence_va(self, r_s_latent: torch.Tensor, wa_latent: torch.Tensor,
                               we_latent: torch.Tensor, audio_num_frames: int, float_fmt_model: FlowMatchingTransformer,
-                              a_cfg_scale: float, r_cfg_scale: float, e_cfg_scale: float,
+                              a_cfg_scale: float, r_cfg_scale: float, e_cfg_scale: float, include_r_cfg: bool,
                               nfe: int, torchdiffeq_ode_method: str, ode_atol: float, ode_rtol: float,
                               audio_dropout_prob: float, ref_dropout_prob: float, emotion_dropout_prob: float,
                               fix_noise_seed: bool, seed: int):
@@ -705,7 +709,8 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
                     a_cfg_scale=a_cfg_scale,  # From direct input
                     r_cfg_scale=r_cfg_scale,  # From direct input
                     e_cfg_scale=e_cfg_scale,  # From direct input
-                    noise_seed_generator=noise_gen  # Configured generator
+                    include_r_cfg=include_r_cfg,  # From direct input
+                    noise_seed_generator=noise_gen,  # Configured generator
                 )
                 r_d_latents_cpu = r_d_latents_gpu.cpu()
 

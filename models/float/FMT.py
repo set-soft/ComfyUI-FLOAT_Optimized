@@ -323,26 +323,42 @@ class FlowMatchingTransformer(BaseModel):
 
     @torch.no_grad()
     def forward_with_cfv(self, t, x, wa, wr, we, prev_x, prev_wa, a_cfg_scale=1.0, r_cfg_scale=1.0, e_cfg_scale=1.0,
-                         **kwargs) -> torch.Tensor:
+                         include_r_cfg=False, **kwargs) -> torch.Tensor:
         if a_cfg_scale != 1.0 or r_cfg_scale != 1.0 or e_cfg_scale != 1.0:
             null_wa = torch.zeros_like(wa)
             null_we = torch.zeros_like(we)
-            # null_wr = torch.zeros_like(wr)
+            null_wr = torch.zeros_like(wr)
 
-            audio_cat = torch.cat([null_wa, wa, wa], dim=0)           # concat along batch
-            ref_cat = torch.cat([wr, wr, wr], dim=0)                  # concat along batch
-            emotion_cat = torch.cat([null_we, we, null_we], dim=0)    # concat along batch
-            x = torch.cat([x, x, x], dim=0)                           # concat along batch
+            if not include_r_cfg:
+                audio_cat = torch.cat([null_wa, wa, wa], dim=0)           # concat along batch
+                ref_cat = torch.cat([wr, wr, wr], dim=0)                  # concat along batch
+                emotion_cat = torch.cat([null_we, we, null_we], dim=0)    # concat along batch
+                x = torch.cat([x, x, x], dim=0)                           # concat along batch
 
-            prev_x_cat = torch.cat([prev_x, prev_x, prev_x], dim=0)
-            prev_wa_cat = torch.cat([prev_wa, prev_wa, prev_wa], dim=0)
+                prev_x_cat = torch.cat([prev_x, prev_x, prev_x], dim=0)
+                prev_wa_cat = torch.cat([prev_wa, prev_wa, prev_wa], dim=0)
 
-            model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, train=False)
-            # uncond: wr  all_cond: wa+wr+we   audio_uncond_emotion: wa+wr
-            uncond, all_cond, audio_uncond_emotion = torch.chunk(model_output, chunks=3, dim=0)
+                model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, train=False)
+                # uncond: wr  all_cond: wa+wr+we   audio_uncond_emotion: wa+wr
+                uncond, all_cond, audio_uncond_emotion = torch.chunk(model_output, chunks=3, dim=0)
 
-            # Classifier-free vector field (cfv) incremental manner
-            # Final Prediction = Baseline(wr) + scale_a * Direction(wa) + scale_e * Direction(we)
-            return uncond + a_cfg_scale * (audio_uncond_emotion - uncond) + e_cfg_scale * (all_cond - audio_uncond_emotion)
+                # Classifier-free vector field (cfv) incremental manner
+                # Final Prediction = Baseline(wr) + scale_a * Direction(wa) + scale_e * Direction(we)
+                return uncond + a_cfg_scale * (audio_uncond_emotion - uncond) + e_cfg_scale * (all_cond - audio_uncond_emotion)
+            else:
+                # Experimental! we also provide a weight for the reference
+                audio_cat = torch.cat([null_wa, null_wa, wa, wa], dim=0)           # concat along batch
+                ref_cat = torch.cat([null_wr, wr, wr, wr], dim=0)                  # concat along batch
+                emotion_cat = torch.cat([null_we, null_we, we, null_we], dim=0)    # concat along batch
+                x = torch.cat([x, x, x, x], dim=0)                                 # concat along batch
+
+                prev_x_cat = torch.cat([prev_x, prev_x, prev_x, prev_x], dim=0)
+                prev_wa_cat = torch.cat([prev_wa, prev_wa, prev_wa, prev_wa], dim=0)
+
+                model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, train=False)
+                truly_uncond, uncond, all_cond, audio_uncond_emotion = torch.chunk(model_output, chunks=4, dim=0)
+
+                return (truly_uncond + r_cfg_scale * (uncond - truly_uncond) + a_cfg_scale * (audio_uncond_emotion - uncond) +
+                        e_cfg_scale * (all_cond - audio_uncond_emotion))
         else:
             return self.forward(t, x, wa, wr, we, prev_x, prev_wa, train=False)
