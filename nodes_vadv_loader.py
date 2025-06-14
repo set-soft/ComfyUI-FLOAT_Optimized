@@ -69,8 +69,12 @@ class LoadWav2VecModel:
 
         return {
             "required": {
-                "model_folder": (model_folders, {"default": default_model}),
-                "target_device": (device_options, {"default": default_device}),
+                "model_folder": (model_folders, {
+                    "default": default_model,
+                    "tooltip": "Name of the Hugging Face model folder located in ComfyUI/models/audio/"}),
+                "target_device": (device_options, {
+                    "default": default_device,
+                    "tooltip": "The device (CPU or CUDA) to which the model's weights will be assigned for computation."}),
             },
         }
 
@@ -171,8 +175,11 @@ class LoadAudioProjectionLayer:
 
         return {
             "required": {
-                "projection_file": (projection_files,),
-                "target_device": (device_options, {"default": default_device}),
+                "projection_file": (projection_files, {
+                    "tooltip": "The .safetensors file containing the pre-trained weights for the audio projection layer."}),
+                "target_device": (device_options, {
+                    "default": default_device,
+                    "tooltip": "The device (CPU or CUDA) to which the projection layer will be assigned for computation."}),
             }
         }
 
@@ -287,8 +294,12 @@ class LoadEmotionRecognitionModel:
 
         return {
             "required": {
-                "model_folder": (model_folders, {"default": default_model}),
-                "target_device": (device_options, {"default": default_device}),
+                "model_folder": (model_folders, {
+                    "default": default_model,
+                    "tooltip": "Name of the speech emotion recognition model folder in ComfyUI/models/audio/"}),
+                "target_device": (device_options, {
+                    "default": default_device,
+                    "tooltip": "The device (CPU or CUDA) to which the emotion model will be assigned for computation."}),
             }
         }
 
@@ -389,9 +400,15 @@ class LoadFloatEncoderModel:
 
         return {
             "required": {
-                "encoder_file": (weight_files,),
-                "target_device": (device_options, {"default": default_device}),
-                "cudnn_benchmark": ("BOOLEAN", {"default": False}),  # Added CUDNN option here
+                "encoder_file": (weight_files, {
+                    "tooltip": "The .safetensors file containing the pre-trained weights for the FLOAT Encoder."}),
+                "target_device": (device_options, {
+                    "default": default_device,
+                    "tooltip": "The device (CPU or CUDA) where the Encoder will run during inference."}),
+                "cudnn_benchmark": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Enable or disable cuDNN benchmarking for this model's operations. "
+                    "Can improve speed."}),
             }
         }
 
@@ -536,13 +553,25 @@ class LoadFloatSynthesisModel:
 
         return {
             "required": {
-                "synthesis_file": (weight_files,),
-                "target_device": (device_options, {"default": default_device}),
-                "channel_multiplier": ("INT", {"default": base_opts.channel_multiplier
-                                       if hasattr(base_opts, 'channel_multiplier') else 1, "min": 1, "max": 8}),
-                "blur_kernel_str": ("STRING", {"default": str(base_opts.blur_kernel
-                                    if hasattr(base_opts, 'blur_kernel') else [1, 3, 3, 1])}),  # e.g., "[1,3,3,1]"
-                "cudnn_benchmark": ("BOOLEAN", {"default": False}),
+                "synthesis_file": (weight_files, {
+                    "tooltip": "The .safetensors file containing the pre-trained weights for the Synthesis (Decoder)."}),
+                "target_device": (device_options, {
+                    "default": default_device,
+                    "tooltip": "The device (CPU or CUDA) where the Encoder will run during inference."}),
+                "channel_multiplier": ("INT", {
+                    "default": getattr(base_opts, 'channel_multiplier', 1),
+                    "min": 1, "max": 8,
+                    "tooltip": ("Architectural hyperparameter for the Synthesis module's channel counts. "
+                                "Must match the value used to train the loaded weights.")}),
+                "blur_kernel_str": ("STRING", {
+                    "default": str(getattr(base_opts, 'blur_kernel', [1, 3, 3, 1])),  # e.g., "[1,3,3,1]"
+                    "tooltip": ("Architectural hyperparameter defining the blur kernel for upsampling layers, "
+                                "as a Python list string (e.g., '[1,3,3,1]'). "
+                                "Should match the value used to train the loaded weights.")}),
+                "cudnn_benchmark": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Enable or disable cuDNN benchmarking for this model's operations. "
+                    "Can improve speed."}),
             }
         }
 
@@ -718,15 +747,35 @@ class LoadFMTModel:
 
         return {
             "required": {
-                "fmt_file": (weight_files,),
-                "target_device": (device_options, {"default": default_device}),
-                "cudnn_benchmark": ("BOOLEAN", {"default": False}),
-                "dim_e": ("INT", {"default": base_opts.dim_e, "min": 1, "max": 100}),
-                "num_heads": ("INT", {"default": base_opts.num_heads, "min": 1, "max": 32}),
-                "attention_window": ("INT", {"default": base_opts.attention_window, "min": 1, "max": 20}),
-                "num_prev_frames": ("INT", {"default": base_opts.num_prev_frames, "min": 0, "max": 100}),
-                "fps": ("FLOAT", {"default": base_opts.fps, "min": 1.0, "max": 120.0, "step": 0.1}),
-                "wav2vec_sec": ("FLOAT", {"default": base_opts.wav2vec_sec, "min": 0.1, "max": 10.0, "step": 0.1}),
+                "fmt_file": (weight_files, {
+                    "tooltip": "The .safetensors file containing the pre-trained weights for the Flow Matching "
+                    "Transformer (FMT)."}),
+                "target_device": (device_options, {
+                    "default": default_device,
+                    "tooltip": "The device (CPU or CUDA) where the FMT will run during inference."}),
+                "cudnn_benchmark": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Enable or disable cuDNN benchmarking for this model's operations."}),
+                "dim_e": ("INT", {
+                    "default": base_opts.dim_e, "min": 1, "max": 100,
+                    "tooltip": "The dimension of the emotion latent (we), corresponding to the number of emotion classes "
+                    "from the loaded emotion model."}),
+                "num_heads": ("INT", {
+                    "default": base_opts.num_heads, "min": 1, "max": 32,
+                    "tooltip": "Architectural hyperparameter for the number of attention heads in the FMT. "
+                    "Must match the loaded weights."}),
+                "attention_window": ("INT", {
+                    "default": base_opts.attention_window, "min": 1, "max": 20,
+                    "tooltip": "Architectural hyperparameter for the attention mask's local window size."}),
+                "num_prev_frames": ("INT", {
+                    "default": base_opts.num_prev_frames, "min": 0, "max": 100,
+                    "tooltip": "Architectural hyperparameter for the number of previous frames used as context."}),
+                "fps": ("FLOAT", {
+                    "default": base_opts.fps, "min": 1.0, "max": 120.0, "step": 0.1,
+                    "tooltip": "The frames-per-second rate used to define the model's temporal structure."}),
+                "wav2vec_sec": ("FLOAT", {
+                    "default": base_opts.wav2vec_sec, "min": 0.1, "max": 10.0, "step": 0.1,
+                    "tooltip": "Duration of audio processed per chunk to define temporal structure."}),
             }
         }
 
