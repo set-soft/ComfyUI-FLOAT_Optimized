@@ -23,6 +23,7 @@ from .utils.torch import model_to_target
 from .utils.misc import EMOTIONS, NODES_NAME, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .generate import InferenceAgent
 from .models.float.FMT import FlowMatchingTransformer
+from .models.misc import CHANNELS_MAP
 
 BASE_CATEGORY = "FLOAT/Advanced"
 RGBA_CONVERSION_STRATEGIES = [
@@ -37,6 +38,16 @@ SUFFIX = "(Ad)"
 class FloatImageFaceAlign:
     @classmethod
     def INPUT_TYPES(cls):
+        # The list of valid, discrete sizes from the model's channel map.
+        # We can't make the widget a dropdown, but we can use this to set sensible min/max.
+        valid_sizes_from_map = sorted(list(CHANNELS_MAP.keys()))
+
+        # Filter for common practical sizes for the widget's range.
+        practical_sizes = [s for s in valid_sizes_from_map if s >= 64]
+
+        # Get the default size from BaseOptions
+        default_size = BaseOptions.input_size
+
         return {
             "required": {
                 "image": ("IMAGE",),
@@ -47,6 +58,14 @@ class FloatImageFaceAlign:
                     # Only used for "blend_with_color" and "replace_with_color"
                 }),
             },
+            "optional": {
+                "size": ("INT", {
+                    "default": default_size,
+                    "min": min(practical_sizes) if practical_sizes else 64,
+                    "max": max(practical_sizes) if practical_sizes else 1024,
+                    "step": 64  # A common step for power-of-2-like image sizes
+                }),
+            }
         }
 
     RETURN_TYPES = ("IMAGE",)
@@ -57,7 +76,16 @@ class FloatImageFaceAlign:
     UNIQUE_NAME = "FloatImageFaceAlign"
     DISPLAY_NAME = "Face Align for FLOAT"
 
-    def process(self, image, face_margin, rgba_conversion, bkg_color_hex):
+    def process(self, image, face_margin, rgba_conversion, bkg_color_hex, size=None):
+        # Defensive, should be the default
+        sz = size if size is not None else BaseOptions.input_size
+        # Validate that the provided size is one of the valid ones from CHANNELS_MAP
+        if sz not in CHANNELS_MAP:
+            logger.warning(f"Provided size {sz} is not a standard size in CHANNELS_MAP. "
+                           f"This may cause issues with downstream nodes like the Encoder. "
+                           f"Valid sizes are: {sorted(list(CHANNELS_MAP.keys()))}")
+        logger.debug(f"FloatImageFaceAlign input_size: {sz}")
+
         # Defensive: ensure the tensor shape is as documented
         # Should be redundant
         if image.ndim == 3:
@@ -69,7 +97,6 @@ class FloatImageFaceAlign:
             raise ValueError(msg)
 
         batch_size = image.shape[0]
-        sz = BaseOptions.input_size
         ret = torch.empty((batch_size, sz, sz, 3), dtype=torch.float32, device=image.device)
         for b in range(batch_size):
             np_array_image = img_tensor_2_np_array(image[b], rgba_conversion, bkg_color_hex)
