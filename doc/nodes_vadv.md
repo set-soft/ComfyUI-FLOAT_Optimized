@@ -2,16 +2,36 @@
 
 This document provides a reference for the "Very Advanced" (VA) nodes in the ComfyUI FLOAT Optimized integration. These nodes offer granular control over the model's pipeline, allowing users to swap out components like audio encoders, projection layers, and the core sampling model.
 
+**Jump to section:**
+- [Workflow Overview](#workflow-overview)
+- **Loader Nodes**
+  - [LoadWav2VecModel](#loadwav2vecmodel)
+  - [LoadAudioProjectionLayer](#loadaudioprojectionlayer)
+  - [LoadEmotionRecognitionModel](#loademotionrecognitionmodel)
+  - [LoadFloatEncoderModel](#loadfloatencodermodel)
+  - [LoadFloatSynthesisModel](#loadfloatsynthesismodel)
+  - [LoadFMTModel](#loadfmtmodel)
+- **"Apply" Nodes**
+  - [ApplyFloatEncoder](#applyfloatencoder)
+  - [FloatGetIdentityReferenceVA](#floatgetidentityreferenceva)
+  - [FloatAudioPreprocessAndFeatureExtract](#floataudiopreprocessandfeatureextract)
+  - [FloatExtractEmotionWithCustomModel](#floatextractemotionwithcustommodel)
+  - [FloatApplyAudioProjection](#floatapplyaudioprojection)
+  - [FloatSampleMotionSequenceRD_VA](#floatsamplemotionsequencerd_va)
+  - [ApplyFloatSynthesis](#applyfloatsynthesis)
+
+---
+
 ## Workflow Overview
 
 The "Very Advanced" workflow decouples the main `float_pipe` into its constituent parts. A typical graph connects these nodes in a sequence that mirrors the internal logic of the integrated FLOAT model.
 
-**Image Path:** `LoadFloatEncoderModel` -> `ApplyFloatEncoder`
-**Audio Path:** `LoadWav2VecModel` -> `FloatAudioPreprocessAndFeatureExtract` -> `LoadAudioProjectionLayer` -> `FloatApplyAudioProjection`
-**Emotion Path:** `LoadEmotionRecognitionModel` -> `FloatExtractEmotionWithCustomModel`
-**Identity Path:** `ApplyFloatEncoder` -> `LoadFloatSynthesisModel` -> `FloatGetIdentityReferenceVA`
-**Sampling Path:** (Outputs from above paths) -> `LoadFMTModel` -> `FloatSampleMotionSequenceRD_VA`
-**Decoding Path:** (Outputs from Image & Sampling paths) -> `LoadFloatSynthesisModel` -> `ApplyFloatSynthesis`
+**Image Path:** `LoadFloatEncoderModel` → `ApplyFloatEncoder`
+**Audio Path:** `LoadWav2VecModel` → `FloatAudioPreprocessAndFeatureExtract` → `LoadAudioProjectionLayer` → `FloatApplyAudioProjection`
+**Emotion Path:** `LoadEmotionRecognitionModel` → `FloatExtractEmotionWithCustomModel`
+**Identity Path:** `ApplyFloatEncoder` → `LoadFloatSynthesisModel` → `FloatGetIdentityReferenceVA`
+**Sampling Path:** (Outputs from above paths) → `LoadFMTModel` → `FloatSampleMotionSequenceRD_VA`
+**Decoding Path:** (Outputs from Image & Sampling paths) → `LoadFloatSynthesisModel` → `ApplyFloatSynthesis`
 
 ## Loader Nodes (`nodes_adv_loader.py`)
 
@@ -119,7 +139,7 @@ These nodes perform computations using the models loaded by the loader nodes.
   - `float_synthesis`: (FLOAT_SYNTHESIS_MODEL) The loaded FLOAT Synthesis (Decoder) model, which contains the `direction` module.
 - **Outputs:**
   - `float_synthesis_out`: (FLOAT_SYNTHESIS_MODEL) Passthrough of the input synthesis model.
-  - `r_s_latent (Wrs)`: (TORCH_TENSOR) The final reference identity latent (`wr` or `r_s`).
+  - `r_s_latent (Wr→s)`: (TORCH_TENSOR) The final reference identity latent (`wr` or `r_s`).
 
 ### `FloatAudioPreprocessAndFeatureExtract`
 - **Display Name:** FLOAT Audio Feature Extract (VA)
@@ -161,16 +181,16 @@ These nodes perform computations using the models loaded by the loader nodes.
 - **Inputs:**
   - *(Numerous inputs for latents, FMT model, and all CFG/ODE/Seed/Dropout parameters)*
 - **Outputs:**
-  - `r_d_latents (WrD)`: (TORCH_TENSOR) The generated sequence of driven motion latents.
+  - `r_d_latents (Wr→D)`: (TORCH_TENSOR) The generated sequence of driven motion latents.
   - `float_fmt_model_out`: (FLOAT_FMT_MODEL) Passthrough of the input FMT model.
 
 ### `ApplyFloatSynthesis`
 - **Display Name:** Apply FLOAT Synthesis (Decoder) (VA)
 - **Description:** The final image generation step. It takes the bundled appearance latents (from the Appearance Pipe) and the driven motion sequence (`r_d`), then uses the loaded Synthesis/Decoder model to render the final animated image sequence frame by frame.
 - **Inputs:**
-  - `appearance_pipe (Wsr)`: (FLOAT_APPEARANCE_PIPE) The bundled appearance information from `ApplyFloatEncoder`.
+  - `appearance_pipe (Ws→r)`: (FLOAT_APPEARANCE_PIPE) The bundled appearance information from `ApplyFloatEncoder`.
   - `float_synthesis`: (FLOAT_SYNTHESIS_MODEL) The loaded Synthesis (Decoder) module.
-  - `r_d_latents (WrD)`: (TORCH_TENSOR) The driven motion latent sequence from the sampler.
+  - `r_d_latents (Wr→D)`: (TORCH_TENSOR) The driven motion latent sequence from the sampler.
 - **Outputs:**
   - `images`: (IMAGE) The final generated image sequence.
   - `float_synthesis_out`: (FLOAT_SYNTHESIS_MODEL) Passthrough of the input synthesis model.
