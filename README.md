@@ -105,6 +105,12 @@ Note that their input and outputs might change.
 
 ## &#128218; Nodes
 
+The nodes come in three flavors:
+
+- Regular nodes: simple to use but no flexibility and needs more memory. Recommended for casual use.
+- Advanced nodes: uses the same model files as the regular nodes
+- [Very advanced](nodes_vadv.md): uses separated portions and provides flexibility. Recommended for investigating options.
+
 ### Load FLOAT Models (Opt)
 
 - **model**: Shows the models in `models/float`. Currently you can choose between `FLOAT.safetensors` (unified) and `float.pth`

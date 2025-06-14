@@ -33,10 +33,10 @@ repos:
     hooks:
     -   id: codespell
         args: [
-            # "--ignore-words-list=your,custom,words,here",
+            "--ignore-words-list=SER,xxxx",
             # Or point to a file:
-            # "--ignore-words=.codespellignore",
-            "--skip=*.json,*.lock,*.svg,*.css,*.html", # Skip file types less likely to need it
+            #"--ignore-words=.codespellignore",
+            "--skip=*.md,*.json,*.lock,*.svg,*.css,*.html", # Skip file types less likely to need it
             # "--check-filenames",
             # "--check-hidden"
         ]
