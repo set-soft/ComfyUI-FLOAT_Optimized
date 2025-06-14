@@ -338,9 +338,11 @@ class FlowMatchingTransformer(BaseModel):
             prev_wa_cat = torch.cat([prev_wa, prev_wa, prev_wa], dim=0)
 
             model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, train=False)
+            # uncond: wr  all_cond: wa+wr+we   audio_uncond_emotion: wa+wr
             uncond, all_cond, audio_uncond_emotion = torch.chunk(model_output, chunks=3, dim=0)
 
             # Classifier-free vector field (cfv) incremental manner
+            # Final Prediction = Baseline(wr) + scale_a * Direction(wa) + scale_e * Direction(we)
             return uncond + a_cfg_scale * (audio_uncond_emotion - uncond) + e_cfg_scale * (all_cond - audio_uncond_emotion)
         else:
             return self.forward(t, x, wa, wr, we, prev_x, prev_wa, train=False)
