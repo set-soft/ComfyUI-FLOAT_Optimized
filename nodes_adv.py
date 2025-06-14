@@ -542,6 +542,7 @@ def _perform_ode_sampling_loop(
         a_cfg_scale: float,
         r_cfg_scale: float,
         e_cfg_scale: float,
+        include_r_cfg: bool,
 
         # Noise generation parameters
         # Pre-configured torch.Generator or None
@@ -609,7 +610,8 @@ def _perform_ode_sampling_loop(
                 prev_wa=prev_wa_batch,
                 a_cfg_scale=a_cfg_scale,
                 r_cfg_scale=r_cfg_scale,
-                e_cfg_scale=e_cfg_scale
+                e_cfg_scale=e_cfg_scale,
+                include_r_cfg=include_r_cfg
             )
             # fmt.forward_with_cfv returns combined (prev+current), so slice:
             return output_combined_batch[:, model_num_prev_frames:, :]
@@ -759,6 +761,7 @@ class FloatSampleMotionSequenceRD:
                 a_cfg_scale=a_cfg_scale,
                 r_cfg_scale=r_cfg_scale_from_opt,  # Using value from opt
                 e_cfg_scale=e_cfg_scale,
+                include_r_cfg=False,
                 noise_seed_generator=noise_gen,
             )
             r_d_latents_cpu = r_d_latents_gpu.cpu()
