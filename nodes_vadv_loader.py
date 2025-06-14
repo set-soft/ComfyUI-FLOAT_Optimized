@@ -3,6 +3,7 @@
 # Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
+import ast
 from collections import OrderedDict
 import logging
 import re
@@ -28,6 +29,29 @@ PROJECTIONS_DIR = "float/audio_projections"
 MOTION_AE_DIR = "float/motion_autoencoder"
 FMT_SUBDIR = "float/fmt"
 ESPR = "wav2vec-english-speech-emotion-recognition"
+
+
+def safe_parse_list_str(list_str: str, expected_type=int):
+    """
+    Safely parses a string representation of a list into a Python list.
+    e.g., "[1, 3, 3, 1]" -> [1, 3, 3, 1]
+    """
+    try:
+        parsed_list = ast.literal_eval(list_str)
+
+        if not isinstance(parsed_list, list):
+            raise TypeError("Input string does not evaluate to a list.")
+
+        # Optionally, check if all elements are of the expected type
+        if not all(isinstance(x, expected_type) for x in parsed_list):
+            raise TypeError(f"Not all elements in the list are of the expected type ({expected_type.__name__}).")
+
+        return parsed_list
+
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError) as e:
+        logger.error(f"Failed to safely parse list string: '{list_str}'. Error: {e}")
+        # Re-raise with a more user-friendly message
+        raise ValueError(f"Invalid list format for '{list_str}'. Please use Python list syntax, e.g., '[1, 3, 3, 1]'.") from e
 
 
 class LoadWav2VecModel:
@@ -590,10 +614,9 @@ class LoadFloatSynthesisModel:
             raise FileNotFoundError(f"Synthesis weights file not found: {weights_path}")
 
         try:
-            blur_kernel = eval(blur_kernel_str)  # Evaluate string to list
-            if not (isinstance(blur_kernel, list) and all(isinstance(x, int) for x in blur_kernel)):
-                raise ValueError("Blur kernel must be a list of integers (e.g., '[1,3,3,1]')")
-        except Exception as e:
+            blur_kernel = safe_parse_list_str(blur_kernel_str, expected_type=int)  # Evaluate string to list
+        except ValueError as e:
+            # Handle the error, maybe raise it again or default to a safe value
             raise ValueError(f"Invalid blur_kernel_str format: {e}. Must be Python list syntax e.g. '[1,3,3,1]'")
 
         logger.info(f"Loading Synthesis weights from {weights_path} to CPU to infer architecture.")
