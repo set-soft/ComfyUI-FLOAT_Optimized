@@ -30,7 +30,18 @@ This document provides a reference for the "Advanced" (Ad) nodes in the ComfyUI 
 - **Display Name:** FLOAT Advanced Options (Ad)
 - **Description:** A utility node that groups together numerous advanced hyperparameters into a single dictionary (`ADV_FLOAT_DICT`). This dictionary can be passed to loader nodes to configure the model pipeline with non-default settings.
 - **Inputs:**
-  - *(Numerous inputs for CFG scales, dropout probabilities, ODE solver settings, attention parameters, and image processing defaults.)*
+  - **`r_cfg_scale`** (FLOAT): **Reference Identity Guidance Scale.** Controls adherence to the identity when using the experimental `include_r_cfg` feature in the sampler.
+  - **`attention_window`** (INT): **Attention Window Size.** An architectural hyperparameter for the `FlowMatchingTransformer`, defining the local window size for the attention mask. Must match the value the FMT model was trained with.
+  - **`audio_dropout_prob`** (FLOAT): The probability of nulling out the audio condition (`wa`) during ODE sampling. Used for classifier-free guidance and can add variation.
+  - **`ref_dropout_prob`** (FLOAT): The probability of nulling out the reference identity condition (`wr`) during ODE sampling.
+  - **`emotion_dropout_prob`** (FLOAT): The probability of nulling out the emotion condition (`we`) during ODE sampling.
+  - **`ode_atol`** (FLOAT): **Absolute Tolerance** for the ODE solver. A smaller value increases precision but can slow down computation.
+  - **`ode_rtol`** (FLOAT): **Relative Tolerance** for the ODE solver. A smaller value increases precision but can slow down computation.
+  - **`nfe`** (INT): **Number of Function Evaluations.** The number of steps for the ODE solver. Higher values can increase quality and detail at the cost of longer generation time.
+  - **`torchdiffeq_ode_method`** (Dropdown): The specific fixed-step numerical integration method for the ODE solver (e.g., 'euler', 'midpoint', 'rk4').
+  - **`face_margin`** (FLOAT): The default multiplier for the detected face bounding box used by face alignment nodes.
+  - **`rgba_conversion`** (Dropdown): The default strategy to use when converting a 4-channel RGBA image to a 3-channel RGB image.
+  - **`bkg_color_hex`** (STRING): The default background color (in hex format, e.g., `#000000`) to use for blending or replacement during RGBA conversion.
 - **Outputs:**
   - `advanced_options`: (ADV_FLOAT_DICT) A dictionary containing all the specified hyperparameter values.
 
