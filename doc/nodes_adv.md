@@ -63,7 +63,7 @@ This document provides a reference for the "Advanced" (Ad) nodes in the ComfyUI 
   - `r_s_lambda_latent`: (TORCH_TENSOR) The motion control parameters from the `FloatEncodeImageToLatents` node.
   - `float_pipe`: (FLOAT_PIPE) The main loaded FLOAT pipeline.
 - **Outputs:**
-  - `r_s_latent`: (TORCH_TENSOR) The final reference identity latent.
+  - `r_s_latent (Wr→s)`: (TORCH_TENSOR) The final reference identity latent.
   - `float_pipe`: (FLOAT_PIPE) Passthrough of the input pipe.
 
 ### `FloatEncodeAudioToLatentWA`
@@ -76,14 +76,14 @@ This document provides a reference for the "Advanced" (Ad) nodes in the ComfyUI 
 - **Outputs:**
   - `wa_latent`: (TORCH_TENSOR) The final audio conditioning latent sequence.
   - `audio_num_frames`: (INT) The total number of frames calculated from the audio length and FPS.
-  - `preprocessed_audio`: (TORCH_TENSOR) The audio after feature extraction (but before the main Wav2Vec model), ready for the emotion encoder.
+  - `processed_audio_features`: (TORCH_TENSOR) The audio after feature extraction (but before the main Wav2Vec model), ready for the emotion encoder.
   - `float_pipe`: (FLOAT_PIPE) Passthrough of the input pipe.
 
 ### `FloatEncodeEmotionToLatentWE`
 - **Display Name:** FLOAT Encode Emotion to latent we (Ad)
 - **Description:** Generates the emotion conditioning latent (`we`). It uses the `float_pipe`'s internal emotion encoder to either predict the emotion from preprocessed audio features or create a one-hot encoding for a user-specified emotion.
 - **Inputs:**
-  - `preprocessed_audio`: (TORCH_TENSOR) The preprocessed audio features from the `FloatEncodeAudioToLatentWA` node.
+  - `processed_audio_features`: (TORCH_TENSOR) The preprocessed audio features from the `FloatEncodeAudioToLatentWA` node.
   - `float_pipe`: (FLOAT_PIPE) The main loaded FLOAT pipeline.
   - `emotion`: (Dropdown) Select a specific emotion or 'none' to have the model predict from the audio.
 - **Outputs:**

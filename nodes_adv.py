@@ -317,7 +317,7 @@ class FloatGetIdentityReference:
         }
 
     RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_PIPE")
-    RETURN_NAMES = ("r_s_latent", "float_pipe")
+    RETURN_NAMES = ("r_s_latent (Wr→s)", "float_pipe")
     FUNCTION = "get_identity_reference_batch"
     CATEGORY = BASE_CATEGORY
     DESCRIPTION = "Derives the batched identity reference latent (r_s) from r_s_lambda."
@@ -370,7 +370,7 @@ class FloatEncodeAudioToLatentWA:
         }
 
     RETURN_TYPES = ("TORCH_TENSOR", "INT", "TORCH_TENSOR", "FLOAT_PIPE")
-    RETURN_NAMES = ("wa_latent", "audio_num_frames", "preprocessed_audio", "float_pipe")
+    RETURN_NAMES = ("wa_latent", "audio_num_frames", "processed_audio_features", "float_pipe")
     FUNCTION = "encode_audio_to_wa"
     CATEGORY = BASE_CATEGORY
     DESCRIPTION = "Resamples, preprocesses a batch of audio (uniform length), and encodes it into WA."
@@ -398,7 +398,7 @@ class FloatEncodeAudioToLatentWA:
         batch_size = input_waveform_batch.shape[0]
         num_samples_input = input_waveform_batch.shape[2]  # Assuming uniform S
 
-        preprocessed_audio_list: List[torch.Tensor] = []
+        processed_audio_features_list: List[torch.Tensor] = []
 
         logger.info(f"Preprocessing batch of {batch_size} audio clip(s) each with {num_samples_input} samples...")
         # Since default_aud_loader only processes the first item of a batch, we loop.
@@ -412,11 +412,11 @@ class FloatEncodeAudioToLatentWA:
 
             # Output shape: (NumSamplesAfterPrep)
             processed_single_audio_cpu = agent.data_processor.default_aud_loader(single_audio_item_dict)
-            preprocessed_audio_list.append(processed_single_audio_cpu)
+            processed_audio_features_list.append(processed_single_audio_cpu)
 
         # Stack into a batch: (BatchSize, NumSamplesAfterPrep)
         try:
-            preprocessed_audio_batched_cpu = torch.stack(preprocessed_audio_list, dim=0)
+            processed_audio_features_batched_cpu = torch.stack(processed_audio_features_list, dim=0)
         except RuntimeError as e:
             if "stack expects each tensor to be equal size" in str(e):
                 raise RuntimeError(
@@ -428,7 +428,7 @@ class FloatEncodeAudioToLatentWA:
                 ) from e
             raise e  # Re-raise other runtime errors
 
-        num_samples_after_prep = preprocessed_audio_batched_cpu.shape[1]
+        num_samples_after_prep = processed_audio_features_batched_cpu.shape[1]
 
         # original_agent_opt_fps = opt.fps
         opt.fps = fps
@@ -436,7 +436,7 @@ class FloatEncodeAudioToLatentWA:
         agent.G.audio_encoder.target_device = opt.rank
         agent.G.audio_encoder.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
         with model_to_target(agent.G.audio_encoder):
-            audio_on_device = preprocessed_audio_batched_cpu.to(opt.rank)
+            audio_on_device = processed_audio_features_batched_cpu.to(opt.rank)
 
             # Calculate Number of Frames based on the now uniform num_samples_after_prep
             audio_num_frames = math.ceil(num_samples_after_prep * opt.fps / opt.sampling_rate)
@@ -448,7 +448,7 @@ class FloatEncodeAudioToLatentWA:
 
             wa_latent_cpu = wa_latent_gpu.cpu()
 
-            return (wa_latent_cpu, audio_num_frames, preprocessed_audio_batched_cpu, float_pipe)
+            return (wa_latent_cpu, audio_num_frames, processed_audio_features_batched_cpu, float_pipe)
 
 
 class FloatEncodeEmotionToLatentWE:
@@ -456,7 +456,7 @@ class FloatEncodeEmotionToLatentWE:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "preprocessed_audio": ("TORCH_TENSOR",),  # Output from FloatEncodeAudioToLatentWA
+                "processed_audio_features": ("TORCH_TENSOR",),  # Output from FloatEncodeAudioToLatentWA
                 "float_pipe": ("FLOAT_PIPE",),
                 "emotion": (EMOTIONS, {"default": "none"}),
             }
@@ -470,26 +470,26 @@ class FloatEncodeEmotionToLatentWE:
     UNIQUE_NAME = "FloatEncodeEmotionToLatentWE"
     DISPLAY_NAME = "FLOAT Encode Emotion to latent we"
 
-    def encode_emotion_to_we(self, preprocessed_audio: torch.Tensor, float_pipe: InferenceAgent, emotion: str):
+    def encode_emotion_to_we(self, processed_audio_features: torch.Tensor, float_pipe: InferenceAgent, emotion: str):
         agent = float_pipe
         opt = agent.opt
 
         # --- Input Validation ---
-        if not isinstance(preprocessed_audio, torch.Tensor):
-            raise TypeError(f"Input 'preprocessed_audio' must be a torch.Tensor, "
-                            f"got {type(preprocessed_audio)}")
+        if not isinstance(processed_audio_features, torch.Tensor):
+            raise TypeError(f"Input 'processed_audio_features' must be a torch.Tensor, "
+                            f"got {type(processed_audio_features)}")
         # Expected shape: (B, NumSamplesAfterPrep)
-        if preprocessed_audio.ndim != 2:
-            raise ValueError(f"Input 'preprocessed_audio' must be a 2D tensor (Batch, NumSamples), "
-                             f"got {preprocessed_audio.ndim}D with shape {preprocessed_audio.shape}.")
+        if processed_audio_features.ndim != 2:
+            raise ValueError(f"Input 'processed_audio_features' must be a 2D tensor (Batch, NumSamples), "
+                             f"got {processed_audio_features.ndim}D with shape {processed_audio_features.shape}.")
 
-        batch_size = preprocessed_audio.shape[0]
+        batch_size = processed_audio_features.shape[0]
 
         agent.G.emotion_encoder.target_device = opt.rank
         agent.G.emotion_encoder.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
         with model_to_target(agent.G.emotion_encoder):
             # emotion_encoder contains Wav2Vec2ForSpeechClassification model
-            audio_on_device = preprocessed_audio.to(opt.rank)
+            audio_on_device = processed_audio_features.to(opt.rank)
 
             device_for_one_hot = opt.rank  # Target device for one_hot tensor
 
