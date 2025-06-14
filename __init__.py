@@ -7,6 +7,7 @@
 from . import nodes
 from . import nodes_adv
 from . import nodes_vadv
+from . import nodes_vadv_loader
 import inspect
 import logging
 from .utils.misc import NODES_NAME
@@ -32,6 +33,7 @@ def register_nodes(module):
 register_nodes(nodes)
 register_nodes(nodes_adv)
 register_nodes(nodes_vadv)
+register_nodes(nodes_vadv_loader)
 
 init_logger.info(f"Registering {len(NODE_CLASS_MAPPINGS)} node(s).")
 init_logger.debug(f"{list(NODE_DISPLAY_NAME_MAPPINGS.values())}")
