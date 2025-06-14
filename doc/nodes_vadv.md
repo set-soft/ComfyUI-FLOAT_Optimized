@@ -2,7 +2,7 @@
 
 This document provides a reference for the "Very Advanced" (VA) nodes in the ComfyUI FLOAT Optimized integration. These nodes offer granular control over the model's pipeline, allowing users to swap out components like audio encoders, projection layers, and the core sampling model.
 
-![FLOAT Encoder Architecture Diagram](doc/nodes_vadv.jpg)
+![FLOAT Encoder Architecture Diagram](nodes_vadv.jpg)
 
 **Jump to section:**
 - [Workflow Overview](#workflow-overview)

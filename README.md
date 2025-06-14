@@ -7,6 +7,23 @@
 
 </div>
 
+**Table of Contents**
+1. [Installation](#-installation)
+2. [Usage](#-usage)
+3. [Manual Models Download](#-manual-models-download)
+   - [Simple](#simple)
+   - [Flexible](#flexible)
+   - [Very Advanced](#very-advanced)
+4. [Nodes](#-nodes)
+   - [Load FLOAT Models (Opt)](#load-float-models-opt)
+   - [FLOAT Process (Opt)](#float-process-opt)
+   - [FLOAT Advanced Options](#float-advanced-options)
+5. [Debugging](#-debugging)
+6. [Citation](#-citation-of-the-paper)
+7. [Attributions](#-attributions)
+8. [License](#-license)
+---
+
 This project provides a ComfyUI wrapper of [FLOAT](https://github.com/deepbrainai-research/float) for Generative Motion Latent Flow Matching for Audio-driven Talking Portrait
 
 The code was optimized to reduce VRAM usage and avoid temporal files.
