@@ -108,7 +108,7 @@ Note that their input and outputs might change.
 The nodes come in three flavors:
 
 - Regular nodes: simple to use but no flexibility and needs more memory. Recommended for casual use.
-- Advanced nodes: uses the same model files as the regular nodes
+- [Advanced nodes](doc/nodes_adv.md): uses the same model files as the regular nodes
 - [Very advanced](doc/nodes_vadv.md): uses separated portions and provides flexibility. Recommended for investigating options.
 
 ### Load FLOAT Models (Opt)
