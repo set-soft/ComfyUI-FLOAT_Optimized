@@ -491,7 +491,6 @@ class FloatGetIdentityReferenceVA:
 
         # Ensure model is on the correct device for THIS operation
         with model_to_target(synthesis_module):
-            synthesis_module.to(synthesis_device)
             r_s_lambda_dev = r_s_lambda_latent.to(synthesis_device)
 
             # --- Core Operation ---
