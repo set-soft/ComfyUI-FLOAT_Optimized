@@ -8,7 +8,7 @@ import math
 import torch
 import torch.nn.functional as F
 # from tqdm import tqdm
-from typing import List, Dict  # , NewType
+from typing import Dict
 # ComfyUI
 import comfy.utils
 
@@ -280,8 +280,8 @@ class ApplyFloatEncoder:
     UNIQUE_NAME = "ApplyFloatEncoder"
     DISPLAY_NAME = "Apply FLOAT Encoder"
     DESCRIPTION = ("Applies the loaded FLOAT Encoder to a batch of reference images. It preprocesses the images and passes "
-                   "them through the encoder to extract the core appearance latent (s_r), motion control parameters "
-                   "(r_s_lambda), and a dictionary of multi-scale feature maps (s_r_feats) for the decoder.")
+                   "them through the encoder to extract the core appearance latent and multi-scale feature maps, "
+                   "which are bundled into a single Appearance Pipe.")
     CATEGORY = BASE_CATEGORY
 
     @classmethod
@@ -293,8 +293,8 @@ class ApplyFloatEncoder:
             }
         }
 
-    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_FEATS_DICT", "TORCH_TENSOR", "FLOAT_ENCODER_MODEL")
-    RETURN_NAMES = ("s_r_latent", "s_r_feats_dict", "r_s_lambda_latent", "float_encoder_out")
+    RETURN_TYPES = ("FLOAT_APPEARANCE_PIPE", "TORCH_TENSOR", "FLOAT_ENCODER_MODEL")
+    RETURN_NAMES = ("appearance_pipe (wS→r)", "r_s_lambda_latent", "float_encoder_out")
     FUNCTION = "apply_encoder"
 
     def apply_encoder(self, ref_image: torch.Tensor, float_encoder: FloatEncoderModule):
@@ -337,28 +337,29 @@ class ApplyFloatEncoder:
             else:  # This path should ideally not be taken with current usage
                 r_s_lambda_batch_gpu = r_s_lambda_intermediate
 
-            s_r_latent_cpu = s_r_batch_gpu.cpu()
-            r_s_lambda_latent_cpu = r_s_lambda_batch_gpu.cpu()
-            s_r_feats_cpu_list = [feat.cpu() for feat in s_r_feats_batch_list_gpu]
-            s_r_feats_dict_cpu = {"value": s_r_feats_cpu_list}
+        # Bundle s_r and s_r_feats into a single dictionary
+        appearance_pipe = {
+            "h_source": s_r_batch_gpu.cpu(),  # This is the s_r_latent, also known as wS→r
+            "feats": [feat.cpu() for feat in s_r_feats_batch_list_gpu]
+        }
+        r_s_lambda_latent_cpu = r_s_lambda_batch_gpu.cpu()
 
-        return (s_r_latent_cpu, s_r_feats_dict_cpu, r_s_lambda_latent_cpu, float_encoder)
+        return (appearance_pipe, r_s_lambda_latent_cpu, float_encoder)
 
 
 class ApplyFloatSynthesis:
     UNIQUE_NAME = "ApplyFloatSynthesis"
     DISPLAY_NAME = "Apply FLOAT Synthesis"
-    DESCRIPTION = ("The final image generation step. It takes the appearance latents (s_r, s_r_feats) and the driven motion "
-                   "sequence (r_d) and uses the loaded Synthesis/Decoder model to render the final animated "
-                   "image sequence frame by frame, handling the style-based modulated convolutions and flow warping.")
+    DESCRIPTION = ("The final image generation step. It takes the bundled appearance latents (from the Appearance Pipe) and "
+                   "the driven motion sequence (r_d), then uses the loaded Synthesis/Decoder model to render the "
+                   "final animated image sequence frame by frame.")
     CATEGORY = BASE_CATEGORY
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "s_r_latent": ("TORCH_TENSOR",),
-                "s_r_feats_dict": ("FLOAT_FEATS_DICT",),
+                "appearance_pipe": ("FLOAT_APPEARANCE_PIPE",),
                 "float_synthesis": ("FLOAT_SYNTHESIS_MODEL",),
                 "r_d_latents": ("TORCH_TENSOR",),
             }
@@ -368,10 +369,16 @@ class ApplyFloatSynthesis:
     RETURN_NAMES = ("images", "float_synthesis_out")
     FUNCTION = "apply_synthesis"
 
-    def apply_synthesis(self, s_r_latent: torch.Tensor,
-                        s_r_feats_dict: Dict[str, List[torch.Tensor]],
+    def apply_synthesis(self, appearance_pipe: Dict,
                         float_synthesis: FloatSynthesisModule,
                         r_d_latents: torch.Tensor):
+        # Unpack the appearance_pipe dictionary
+        try:
+            s_r_latent = appearance_pipe["h_source"]
+            s_r_feats_list = appearance_pipe["feats"]
+        except KeyError as e:
+            raise KeyError(f"Input 'appearance_pipe' is missing an expected key: {e}. "
+                           "It must be the output of an ApplyFloatEncoder node.")
 
         synthesis_device = float_synthesis.target_device
 
@@ -387,15 +394,12 @@ class ApplyFloatSynthesis:
         # --- Input Validation ---
         if not all(isinstance(t, torch.Tensor) for t in [s_r_latent, r_d_latents]):
             raise TypeError("s_r_latent and r_d_latents must be torch.Tensors.")
-        if (not isinstance(s_r_feats_dict, dict) or "value" not in s_r_feats_dict or
-           not isinstance(s_r_feats_dict["value"], list)):
-            raise TypeError("s_r_feats_dict format error.")
-        if not all(isinstance(t, torch.Tensor) for t in s_r_feats_dict["value"]):
-            raise TypeError("s_r_feats_dict['value'] must be a list of Tensors.")
+        if not (isinstance(s_r_feats_list, list) and all(isinstance(t, torch.Tensor) for t in s_r_feats_list)):
+            raise TypeError("appearance_pipe['feats'] must be a list of Tensors.")
 
         batch_size = s_r_latent.shape[0]
         if not (r_d_latents.shape[0] == batch_size and
-                all(feat.shape[0] == batch_size for feat in s_r_feats_dict["value"])):
+                all(feat.shape[0] == batch_size for feat in s_r_feats_list)):
             raise ValueError("Batch size mismatch in inputs for Synthesis.")
 
         num_frames_to_decode = r_d_latents.shape[1]
@@ -408,7 +412,7 @@ class ApplyFloatSynthesis:
 
         with model_to_target(float_synthesis):
             s_r_dev = s_r_latent.to(synthesis_device)
-            s_r_feats_dev_list = [feat.to(synthesis_device) for feat in s_r_feats_dict["value"]]
+            s_r_feats_dev_list = [feat.to(synthesis_device) for feat in s_r_feats_list]
             r_d_dev = r_d_latents.to(synthesis_device)
 
             decoded_image_sequences_list = []
