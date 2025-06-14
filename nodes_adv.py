@@ -225,11 +225,11 @@ class FloatEncodeImageToLatents:
         }
 
     # Define a unique string for the custom feats dictionary type
-    RETURN_TYPES = ("TORCH_TENSOR", "FLOAT_FEATS_DICT", "TORCH_TENSOR", "FLOAT_PIPE")
-    RETURN_NAMES = ("s_r_latent", "s_r_feats_dict", "r_s_lambda_latent", "float_pipe")
+    RETURN_TYPES = ("FLOAT_APPEARANCE_PIPE", "TORCH_TENSOR", "FLOAT_PIPE")
+    RETURN_NAMES = ("appearance_pipe (Ws→r)", "r_s_lambda_latent", "float_pipe")
     FUNCTION = "encode_image_batch"
     CATEGORY = BASE_CATEGORY
-    DESCRIPTION = "Encodes a batch of reference images into FLOAT latents (s_r, r_s_lambda, s_r_feats)."
+    DESCRIPTION = "Encodes a batch of reference images into FLOAT latents (Ws→r, r_s_lambda)."
     UNIQUE_NAME = "FloatEncodeImageToLatents"
     DISPLAY_NAME = "FLOAT Encode Image to Latents"
 
@@ -285,15 +285,17 @@ class FloatEncodeImageToLatents:
                 # s_r_feats_list_gpu: List of Tensors, each (B, C_feat, H_feat, W_feat)
 
                 # --- Output Formatting ---
-                s_r_latent_cpu = s_r.cpu()
                 r_s_lambda_latent_cpu = r_s_lambda.cpu()
-                s_r_feats_cpu_list = [feat.cpu() for feat in s_r_feats_list_gpu]
-                s_r_feats_dict_cpu = {"value": s_r_feats_cpu_list}
+                # Bundle s_r and s_r_feats into a single dictionary
+                appearance_pipe = {
+                    "h_source": s_r.cpu(),  # This is the s_r_latent, also known as wS→r
+                    "feats": [feat.cpu() for feat in s_r_feats_list_gpu]
+                }
 
                 # This node does not set agent.G.first_run = False.
                 # That should be handled by a node that completes the full pipeline
                 # or if this component itself is considered fully "warmed up".
-                return (s_r_latent_cpu, s_r_feats_dict_cpu, r_s_lambda_latent_cpu, float_pipe)
+                return (appearance_pipe, r_s_lambda_latent_cpu, float_pipe)
 
             finally:
                 # --- Restore Pbar State (if changed) ---
@@ -774,8 +776,9 @@ class FloatDecodeLatentsToImages:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "s_r_latent": ("TORCH_TENSOR",),          # (B, DimW)
-                "s_r_feats_dict": ("FLOAT_FEATS_DICT",),  # Dict: {"value": List[(B, C, H, W), ...]}
+                "appearance_pipe": ("FLOAT_APPEARANCE_PIPE", {
+                    "tooltip": "The bundled appearance information (s_r latent and feature maps) from the "
+                    "FloatEncodeImageToLatents node. (Ws→r)"}),
                 "r_d_latents": ("TORCH_TENSOR",),         # (B, NumFrames, DimW)
                 "float_pipe": ("FLOAT_PIPE",),
             }
@@ -790,26 +793,30 @@ class FloatDecodeLatentsToImages:
     UNIQUE_NAME = "FloatDecodeLatentsToImages"
     DISPLAY_NAME = "FLOAT Decode Latents to Images"
 
-    def decode_latents_to_images(self, s_r_latent: torch.Tensor,
-                                 s_r_feats_dict: Dict[str, List[torch.Tensor]],
+    def decode_latents_to_images(self, appearance_pipe: Dict,
                                  r_d_latents: torch.Tensor,
                                  float_pipe: InferenceAgent):
         agent = float_pipe
         opt = agent.opt
 
+        # Unpack the appearance_pipe dictionary
+        try:
+            s_r_latent = appearance_pipe["h_source"]
+            s_r_feats_list = appearance_pipe["feats"]
+        except KeyError as e:
+            raise KeyError(f"Input 'appearance_pipe' is missing an expected key: {e}. "
+                           "It must be the output of a FloatEncodeImageToLatents node.")
+
         # --- Input Validation ---
         if not all(isinstance(t, torch.Tensor) for t in [s_r_latent, r_d_latents]):
             raise TypeError("Inputs s_r_latent and r_d_latents must be torch.Tensors.")
-        if not isinstance(s_r_feats_dict, dict) or "value" not in s_r_feats_dict or \
-           not isinstance(s_r_feats_dict["value"], list):
-            raise TypeError("s_r_feats_dict must be a dict with key 'value' containing a list of tensors.")
-        if not all(isinstance(t, torch.Tensor) for t in s_r_feats_dict["value"]):
-            raise TypeError("All elements in s_r_feats_dict['value'] must be torch.Tensors.")
+        if not (isinstance(s_r_feats_list, list) and all(isinstance(t, torch.Tensor) for t in s_r_feats_list)):
+            raise TypeError("appearance_pipe['feats'] must be a list of Tensors.")
 
         batch_size = s_r_latent.shape[0]
         if not (r_d_latents.shape[0] == batch_size and
-                all(feat.shape[0] == batch_size for feat in s_r_feats_dict["value"])):
-            s_r_feats_batch_sizes = [feat.shape[0] for feat in s_r_feats_dict["value"]]
+                all(feat.shape[0] == batch_size for feat in s_r_feats_list)):
+            s_r_feats_batch_sizes = [feat.shape[0] for feat in s_r_feats_list]
             raise ValueError(
                 f"Batch size mismatch: s_r_latent {batch_size}, r_d_latents {r_d_latents.shape[0]}, "
                 f"s_r_feats batch sizes {s_r_feats_batch_sizes}. All must match."
@@ -836,7 +843,7 @@ class FloatDecodeLatentsToImages:
         with model_to_target(agent.G.motion_autoencoder.dec):
             try:
                 s_r_dev = s_r_latent.to(opt.rank)
-                s_r_feats_dev_list = [feat.to(opt.rank) for feat in s_r_feats_dict["value"]]
+                s_r_feats_dev_list = [feat.to(opt.rank) for feat in s_r_feats_list]
                 r_d_dev = r_d_latents.to(opt.rank)
 
                 decoded_image_sequences_list = []  # To collect (T, H, W, C) tensors
