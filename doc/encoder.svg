@@ -1,0 +1,180 @@
+<svg width="1000" height="920" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <!-- SVG Definitions -->
+  <defs>
+    <style>
+      .conv-block { fill: #a2d2ff; stroke: #0077b6; stroke-width: 1.5; }
+      .res-block { fill: #bde0fe; stroke: #0077b6; stroke-width: 1.5; }
+      .fc-block { fill: #ffc8dd; stroke: #c9184a; stroke-width: 1.5; }
+      .input-output { fill: #cdb4db; stroke: #6d23b6; stroke-width: 1.5; }
+      .text-label { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; font-size: 13px; fill: #333; text-anchor: middle; }
+      .text-label-small { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; font-size: 11px; fill: #555; text-anchor: middle; }
+      .arrow { stroke: #333; stroke-width: 2; marker-end: url(#arrowhead); }
+      .skip-arrow { stroke: #0096c7; stroke-width: 1.5; marker-end: url(#arrowhead-skip); fill: none; }
+      .feat-arrow { stroke: #8ac926; stroke-width: 2; marker-end: url(#arrowhead-feat); }
+      .plus-circle { fill: #0096c7; stroke: none; }
+      .plus-sign { fill: white; font-size: 20px; font-weight: bold; text-anchor: middle; dominant-baseline: central; }
+    </style>
+    <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333" />
+    </marker>
+    <marker id="arrowhead-skip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0096c7" />
+    </marker>
+    <marker id="arrowhead-feat" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8ac926" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="500" y="30" font-size="24" font-family="Helvetica, sans-serif" text-anchor="middle" font-weight="bold">FLOAT Encoder Architecture</text>
+
+  <!-- Part 1: EncoderApp -->
+  <text x="250" y="60" font-size="18" font-family="Helvetica, sans-serif" text-anchor="middle" font-style="italic" fill="#555">EncoderApp (self.net_app)</text>
+
+  <!-- Input Image -->
+  <rect x="50" y="80" width="120" height="60" class="input-output" rx="5"/>
+  <text x="110" y="105" class="text-label">Input Image</text>
+  <text x="110" y="125" class="text-label-small">3 x 512 x 512</text>
+
+  <!-- ConvLayer 0 -->
+  <path d="M 170 110 L 250 110" class="arrow"/>
+  <rect x="250" y="80" width="120" height="60" class="conv-block" rx="5"/>
+  <text x="310" y="105" class="text-label">ConvLayer 1x1</text>
+  <text x="310" y="125" class="text-label-small">32 x 512 x 512</text>
+
+  <!-- ResBlock 1 -->
+  <path d="M 370 110 L 450 110" class="arrow"/>
+  <rect x="450" y="80" width="120" height="60" class="res-block" rx="5"/>
+  <text x="510" y="105" class="text-label">ResBlock</text>
+  <text x="510" y="125" class="text-label-small">64 x 256 x 256</text>
+  <path d="M 450 140 Q 510 160 570 140" class="skip-arrow"/>
+  <circle cx="510" cy="80" r="10" class="plus-circle"/>
+  <text x="510" y="81" class="plus-sign">+</text>
+
+  <!-- Feats Output 1 -->
+  <path d="M 510 140 L 510 190" class="feat-arrow"/>
+
+  <!-- ResBlock 2 -->
+  <path d="M 570 110 L 650 110" class="arrow"/>
+  <rect x="650" y="80" width="120" height="60" class="res-block" rx="5"/>
+  <text x="710" y="105" class="text-label">ResBlock</text>
+  <text x="710" y="125" class="text-label-small">128 x 128 x 128</text>
+  <path d="M 650 140 Q 710 160 770 140" class="skip-arrow"/>
+  <circle cx="710" cy="80" r="10" class="plus-circle"/>
+  <text x="710" y="81" class="plus-sign">+</text>
+
+  <!-- Feats Output 2 -->
+  <path d="M 710 140 L 710 190" class="feat-arrow"/>
+
+  <!-- Downwards Arrow -->
+  <path d="M 770 110 L 850 110 C 880 110 880 110 880 140 L 880 250" class="arrow" fill="none"/>
+
+  <!-- ResBlock 3 -->
+  <rect x="770" y="250" width="120" height="60" class="res-block" rx="5"/>
+  <text x="830" y="275" class="text-label">ResBlock</text>
+  <text x="830" y="295" class="text-label-small">256 x 64 x 64</text>
+  <path d="M 770 310 Q 830 330 890 310" class="skip-arrow"/>
+  <circle cx="830" cy="250" r="10" class="plus-circle"/>
+  <text x="830" y="251" class="plus-sign">+</text>
+  <path d="M 830 310 L 830 360" class="feat-arrow"/>
+
+  <!-- ResBlock 4 -->
+  <path d="M 770 280 L 670 280" class="arrow"/>
+  <rect x="550" y="250" width="120" height="60" class="res-block" rx="5"/>
+  <text x="610" y="275" class="text-label">ResBlock</text>
+  <text x="610" y="295" class="text-label-small">512 x 32 x 32</text>
+  <path d="M 550 310 Q 610 330 670 310" class="skip-arrow"/>
+  <circle cx="610" cy="250" r="10" class="plus-circle"/>
+  <text x="610" y="251" class="plus-sign">+</text>
+  <path d="M 610 310 L 610 360" class="feat-arrow"/>
+
+  <!-- ResBlock 5 -->
+  <path d="M 550 280 L 450 280" class="arrow"/>
+  <rect x="330" y="250" width="120" height="60" class="res-block" rx="5"/>
+  <text x="390" y="275" class="text-label">ResBlock</text>
+  <text x="390" y="295" class="text-label-small">512 x 16 x 16</text>
+  <path d="M 330 310 Q 390 330 450 310" class="skip-arrow"/>
+  <circle cx="390" cy="250" r="10" class="plus-circle"/>
+  <text x="390" y="251" class="plus-sign">+</text>
+  <path d="M 390 310 L 390 360" class="feat-arrow"/>
+
+  <!-- Downwards Arrow -->
+  <path d="M 330 280 L 250 280 C 220 280 220 280 220 310 L 220 420" class="arrow" fill="none"/>
+
+  <!-- ResBlock 6 -->
+  <rect x="160" y="420" width="120" height="60" class="res-block" rx="5"/>
+  <text x="220" y="445" class="text-label">ResBlock</text>
+  <text x="220" y="465" class="text-label-small">512 x 8 x 8</text>
+  <path d="M 160 480 Q 220 500 280 480" class="skip-arrow"/>
+  <circle cx="220" cy="420" r="10" class="plus-circle"/>
+  <text x="220" y="421" class="plus-sign">+</text>
+  <path d="M 220 480 L 220 530" class="feat-arrow"/>
+
+  <!-- ResBlock 7 -->
+  <path d="M 280 450 L 360 450" class="arrow"/>
+  <rect x="360" y="420" width="120" height="60" class="res-block" rx="5"/>
+  <text x="420" y="445" class="text-label">ResBlock</text>
+  <text x="420" y="465" class="text-label-small">512 x 4 x 4</text>
+  <path d="M 360 480 Q 420 500 480 480" class="skip-arrow"/>
+  <circle cx="420" cy="420" r="10" class="plus-circle"/>
+  <text x="420" y="421" class="plus-sign">+</text>
+  <path d="M 420 480 L 420 530" class="feat-arrow"/>
+
+  <!-- Final Conv -->
+  <path d="M 480 450 L 560 450" class="arrow"/>
+  <rect x="560" y="420" width="120" height="60" class="conv-block" rx="5"/>
+  <text x="620" y="445" class="text-label">Conv 4x4</text>
+  <text x="620" y="465" class="text-label-small">512 x 1 x 1</text>
+
+  <!-- Feats Label -->
+  <text x="460" y="550" class="text-label" fill="#8ac926" font-weight="bold">`feats` Output (List of 7 tensors)</text>
+
+  <!-- Squeeze Operation -->
+  <path d="M 620 480 L 620 580" class="arrow"/>
+  <rect x="570" y="580" width="100" height="40" rx="20" ry="20" fill="#fefae0" stroke="#dda15e"/>
+  <text x="620" y="605" class="text-label">Squeeze</text>
+
+  <!-- `s_r` Output -->
+  <path d="M 620 620 L 620 670" class="arrow"/>
+  <rect x="560" y="670" width="120" height="60" class="input-output" rx="5"/>
+  <text x="620" y="695" class="text-label" font-weight="bold">`s_r` Latent</text>
+  <text x="620" y="715" class="text-label-small">(h_source) Dim: 512</text>
+
+  <!-- Branch to FC Layers -->
+  <path d="M 680 610 L 780 610" class="arrow" fill="none"/>
+
+  <!-- Part 2: Fully Connected Layers -->
+  <text x="750" y="560" font-size="18" font-family="Helvetica, sans-serif" text-anchor="middle" font-style="italic" fill="#555">MLP (self.fc)</text>
+
+  <!-- FC Layers -->
+  <rect x="780" y="580" width="150" height="60" class="fc-block" rx="5"/>
+  <text x="855" y="600" class="text-label">EqualLinear x 4</text>
+  <text x="855" y="615" class="text-label-small">512 -> 512</text>
+  <text x="855" y="630" class="text-label-small">(with ReLU)</text>
+
+  <!-- Last FC Layer -->
+  <path d="M 855 640 L 855 670" class="arrow"/>
+  <rect x="780" y="670" width="150" height="60" class="fc-block" rx="5"/>
+  <text x="855" y="695" class="text-label">EqualLinear</text>
+  <text x="855" y="715" class="text-label-small">512 -> 20</text>
+
+  <!-- `r_s_lambda` Output -->
+  <path d="M 855 730 L 855 780" class="arrow"/>
+  <rect x="795" y="780" width="120" height="60" class="input-output" rx="5"/>
+  <text x="855" y="805" class="text-label" font-weight="bold">`r_s_lambda`</text>
+  <text x="855" y="825" class="text-label-small">(h_motion) Dim: 20</text>
+
+  <!-- Legend -->
+  <g transform="translate(50, 780)">
+    <text x="0" y="0" font-weight="bold" font-size="14">Legend:</text>
+    <rect x="0" y="15" width="20" height="20" class="conv-block"/>
+    <text x="25" y="30" class="text-label-small">Conv Layer</text>
+    <rect x="0" y="45" width="20" height="20" class="res-block"/>
+    <text x="25" y="60" class="text-label-small">ResBlock</text>
+    <rect x="0" y="75" width="20" height="20" class="fc-block"/>
+    <text x="25" y="90" class="text-label-small">Fully Connected</text>
+    <rect x="0" y="105" width="20" height="20" class="input-output"/>
+    <text x="25" y="120" class="text-label-small">Input/Output Latent</text>
+  </g>
+
+</svg>
