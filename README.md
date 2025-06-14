@@ -16,9 +16,7 @@ The code was optimized to reduce VRAM usage and avoid temporal files.
 > Please refer to the licensing terms for more details.
 
 
-<div align="center">
-  <video src="https://github.com/user-attachments/assets/36626b4a-d3e5-4db9-87a7-ca0e949daee0" />
-</div>
+![FLOAT Encoder Architecture Diagram](doc/nodes.jpg)
 
 
 ## 🚀 Installation
