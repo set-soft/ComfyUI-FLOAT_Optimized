@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Salvador E. Tropea
+# Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
+# License: CC BY-NC-SA 4.0
+# Project: ComfyUI-Float_Optimized
 from collections import OrderedDict
 import logging
 import re
@@ -28,6 +33,9 @@ ESPR = "wav2vec-english-speech-emotion-recognition"
 class LoadWav2VecModel:
     UNIQUE_NAME = "LoadWav2VecModel"  # Static class attribute for registration
     DISPLAY_NAME = "Load Wav2Vec Model (for Audio Encoding)"  # Static class attribute
+    DESCRIPTION = ("Loads a standard Hugging Face Wav2Vec2-type model and its feature extractor, wrapping it in the custom "
+                   "FloatWav2VecModel class which handles internal time-domain interpolation. This is used for generating "
+                   "the main audio content features (wa_latent).")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -139,6 +147,9 @@ class LoadWav2VecModel:
 class LoadAudioProjectionLayer:
     UNIQUE_NAME = "LoadAudioProjectionLayer"
     DISPLAY_NAME = "Load Audio Projection Layer"
+    DESCRIPTION = ("Loads weights for an audio projection layer from a .safetensors file. "
+                   "It infers the input and output dimensions from the weights and constructs the layer, "
+                   "which is used to project Wav2Vec features into the wa_latent space.")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -245,6 +256,9 @@ class LoadAudioProjectionLayer:
 class LoadEmotionRecognitionModel:
     UNIQUE_NAME = "LoadEmotionRecognitionModel"
     DISPLAY_NAME = "Load Emotion Recognition Model"
+    DESCRIPTION = ("Loads a Wav2Vec2-based Speech Emotion Recognition model (like the one used by FLOAT)"
+                   " and its associated feature extractor. It outputs the model pipe and the number of "
+                   "emotion classes (dim_e) for downstream use.")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -334,6 +348,9 @@ class LoadEmotionRecognitionModel:
 class LoadFloatEncoderModel:
     UNIQUE_NAME = "LoadFloatEncoderModel"
     DISPLAY_NAME = "Load FLOAT Encoder"
+    DESCRIPTION = ("Loads the weights for the motion_autoencoder's Encoder part from a .safetensors file. "
+                   "It automatically infers the model's architecture (input size, latent dimensions) from the loaded weights, "
+                   "preparing it for image analysis.")
     DEFAULT_ENCODER_FILENAME = "encoder.safetensors"
     CATEGORY = FILE_CATEGORY
 
@@ -475,6 +492,9 @@ class LoadFloatEncoderModel:
 class LoadFloatSynthesisModel:
     UNIQUE_NAME = "LoadFloatSynthesisModel"
     DISPLAY_NAME = "Load FLOAT Synthesis"
+    DESCRIPTION = ("Loads the weights for the motion_autoencoder's Synthesis/Decoder part from a .safetensors file. "
+                   "It infers key architectural parameters from the weights and takes hyperparameters like "
+                   "channel_multiplier as input to construct the image generation model.")
     DEFAULT_SYNTHESIS_FILENAME = "decoder.safetensors"  # Corrected to decoder
     CATEGORY = FILE_CATEGORY
 
@@ -655,6 +675,10 @@ class LoadFloatSynthesisModel:
 class LoadFMTModel:
     UNIQUE_NAME = "LoadFMTModel"
     DISPLAY_NAME = "Load FLOAT FMT Model"
+    DESCRIPTION = ("Loads the Flow Matching Transformer (FMT) weights. "
+                   "It infers the internal architecture (dim_h, fmt_depth, etc.) and requires the user to provide parameters "
+                   "that define the temporal structure (like fps, num_prev_frames) and attention mechanism, validating them "
+                   "against the loaded checkpoint.")
     DEFAULT_FMT_FILENAME = "fmt.safetensors"
     CATEGORY = FILE_CATEGORY
 
