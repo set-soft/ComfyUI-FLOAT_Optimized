@@ -9,7 +9,7 @@
 
 **Table of Contents**
 1. [Installation](#-installation)
-2. [Usage](#-usage)
+2. [Usage](#%EF%B8%8F-usage)
 3. [Manual Models Download](#-manual-models-download)
    - [Simple](#simple)
    - [Flexible](#flexible)
