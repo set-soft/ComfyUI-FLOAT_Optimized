@@ -52,8 +52,7 @@ This document provides a reference for the "Advanced" (Ad) nodes in the ComfyUI 
   - `ref_image`: (IMAGE) A batch of reference images, correctly sized for the encoder.
   - `float_pipe`: (FLOAT_PIPE) The main loaded FLOAT pipeline.
 - **Outputs:**
-  - `s_r_latent`: (TORCH_TENSOR) The core appearance/style latent (`h_source` or `wSr`).
-  - `s_r_feats_dict`: (FLOAT_FEATS_DICT) A dictionary containing the list of multi-scale feature maps from the encoder, used as skip connections by the decoder.
+  - `appearance_pipe (Wsr)`: (FLOAT_APPEARANCE_PIPE) A pipe containing the appearance latent (`h_source` / `s_r`) and the list of feature maps (`feats`).
   - `r_s_lambda_latent`: (TORCH_TENSOR) The motion control parameters (`h_motion`) derived from the reference image.
   - `float_pipe`: (FLOAT_PIPE) Passthrough of the input pipe.
 
@@ -111,8 +110,7 @@ This document provides a reference for the "Advanced" (Ad) nodes in the ComfyUI 
 - **Display Name:** FLOAT Decode Latents to Images (Ad)
 - **Description:** The final image generation step. It uses the decoder from the `float_pipe`'s `motion_autoencoder` to render the final animated image sequence from the appearance latents (`s_r`, `s_r_feats`) and the driven motion sequence (`r_d`).
 - **Inputs:**
-  - `s_r_latent`: (TORCH_TENSOR) The core appearance/style latent.
-  - `s_r_feats_dict`: (FLOAT_FEATS_DICT) The dictionary containing the list of multi-scale feature maps.
+  - `appearance_pipe (Ws→r)`: (FLOAT_APPEARANCE_PIPE) The bundled appearance information from `FloatEncodeImageToLatents`.
   - `r_d_latents`: (TORCH_TENSOR) The driven motion latent sequence from the sampler.
   - `float_pipe`: (FLOAT_PIPE) The main loaded FLOAT pipeline.
 - **Outputs:**
