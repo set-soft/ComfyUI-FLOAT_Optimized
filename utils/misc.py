@@ -16,3 +16,5 @@ TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
     # "explicit_adams", # Fixed-step Adams-Bashforth (multi-step, might need more params like order)
     # "implicit_adams", # Fixed-step Adams-Moulton (multi-step, implicit)
 ]
+FLOAT_URL = "https://huggingface.co/set-soft/float/resolve/main/FLOAT.safetensors?download=true"
+FLOAT_UNIFIED_MODEL = "FLOAT.safetensors"

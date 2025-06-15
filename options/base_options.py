@@ -4,6 +4,7 @@
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
 from dataclasses import dataclass
+from ..utils.misc import FLOAT_UNIFIED_MODEL
 
 
 @dataclass
@@ -22,7 +23,7 @@ class BaseOptions:
     wav2vec_sec: float = 2.0
     wav2vec_config_path: str = "model_configs/wav2vec2_base"
     emotion_ser_config_path: str = "model_configs/emotion_ser"
-    ckpt_filename: str = "FLOAT.safetensors"
+    ckpt_filename: str = FLOAT_UNIFIED_MODEL
     wav2vec_model_path: str = "./checkpoints/wav2vec2-base-960h"
     audio2emotion_path: str = "./checkpoints/wav2vec-english-speech-emotion-recognition"
     attention_window: int = 2

@@ -11,7 +11,9 @@ import comfy.model_management as mm
 import folder_paths
 
 from .options.base_options import BaseOptions
+from .utils.downloader import download_model
 from .utils.logger import main_logger
+from .utils.misc import FLOAT_URL, FLOAT_UNIFIED_MODEL
 from .utils.torch import get_torch_device_options, model_to_target
 from .generate import InferenceAgent
 
@@ -35,7 +37,7 @@ class LoadFloatModels:
 
         return {
             "required": {
-                "model": (available_model_files, {"default": BaseOptions.ckpt_filename}),
+                "model": (available_model_files, {"default": FLOAT_UNIFIED_MODEL}),
                 "target_device": (device_options, {"default": default_device}),
                 "cudnn_benchmark": ("BOOLEAN", {"default": False}, ),
             },
@@ -87,6 +89,8 @@ class LoadFloatModels:
 
             if (not os.path.exists(ckpt_full_path) or not os.path.isdir(wav2vec2_base_960h_models_dir) or
                not os.path.isdir(wav2vec_english_speech_emotion_recognition_models_dir)):
+                # One or both audio processors is missing, download the whole pack
+                # It can only happen if the user has "float.pth" already downloaded and selects it
                 from huggingface_hub import snapshot_download
                 snapshot_download(repo_id="yuvraj108c/float", local_dir=float_models_dir, local_dir_use_symlinks=False)
 
@@ -96,9 +100,14 @@ class LoadFloatModels:
             # Unified model (safetensors)
             # ##############################
             if not os.path.exists(ckpt_full_path):
-                main_logger.warning(f"Model file {ckpt_full_path} not found. Trying to download it ...")
-                from huggingface_hub import snapshot_download
-                snapshot_download(repo_id="set-soft/float", local_dir=float_models_dir)
+                main_logger.warning(f"Model file {ckpt_full_path} not found. Trying to download it...")
+                try:
+                    download_model(url=FLOAT_URL, save_dir=float_models_dir, file_name=FLOAT_UNIFIED_MODEL)
+                except Exception:
+                    # The downloader already logs, but here we have a final message
+                    main_logger.error(f"Failed to download {model}. Please download it manually.")
+                    raise  # Re-raise to show the error in the UI
+
             unified = True
 
         # Use custom dictionary instead of original parser for arguments
