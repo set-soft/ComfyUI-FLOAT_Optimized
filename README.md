@@ -33,7 +33,7 @@ The code was optimized to reduce VRAM usage and avoid temporal files.
 > Please refer to the licensing terms for more details.
 
 
-![FLOAT Encoder Architecture Diagram](doc/nodes.jpg)
+[![FLOAT Encoder Architecture Diagram](doc/nodes.jpg)](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow.json)
 
 
 ## 🚀 Installation
@@ -51,7 +51,7 @@ Note:
 
 ## ☀️ Usage
 
-- Load [example workflow](float_workflow.json)
+- Load [example workflow](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow.json)
 - Upload driving image and audio, click queue.
   You can get the image originally used from [here](https://raw.githubusercontent.com/deepbrainai-research/float/refs/heads/main/assets/sam_altman_512x512.jpg),
   and the audio from [here](https://github.com/deepbrainai-research/float/raw/refs/heads/main/assets/aud-sample-vs-1.wav)

@@ -2,7 +2,9 @@
 
 This document provides a reference for the "Advanced" (Ad) nodes in the ComfyUI FLOAT Optimized integration. These nodes provide a middle ground of control, allowing users to adjust key parts of the pipeline like face alignment and sampling parameters while still using the convenient, all-in-one `float_pipe`.
 
-![FLOAT Encoder Architecture Diagram](nodes_adv.jpg)
+[![FLOAT Encoder Architecture Diagram](nodes_adv.jpg)](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_adv.json)
+
+[Workflow example](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_adv.json)
 
 **Jump to section:**
 - [FloatImageFaceAlign](#floatimagefacealign)
