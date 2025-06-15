@@ -18,7 +18,7 @@ def extract_and_save_motion_ae_part(main_model_path, output_safetensors_path, pa
     """
     if part_to_extract not in ["enc", "dec"]:
         print(f"Error: Invalid part_to_extract '{part_to_extract}'. Must be 'enc' or 'dec'.")
-        return
+        exit(2)
 
     base_prefix = "motion_autoencoder"
     full_prefix = f"{base_prefix}.{part_to_extract}."  # Note the trailing dot
@@ -111,7 +111,7 @@ def main():
             print(f"Created output directory: {output_dir}")
         except OSError as e:
             print(f"Error: Could not create output directory {output_dir}: {e}")
-            return
+            exit(2)
 
     if not args.output_path.endswith(".safetensors"):
         print("Warning: Output path does not end with .safetensors. It will be saved in this format.")
