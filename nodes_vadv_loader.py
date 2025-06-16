@@ -710,8 +710,8 @@ class LoadFMTModel:
         }
 
     # Outputting key inferred and used parameters
-    RETURN_TYPES = ("FLOAT_FMT_MODEL", "FLOAT", "ADV_FLOAT_DICT")
-    RETURN_NAMES = ("float_fmt_model", "fps", "fmt_options_out")
+    RETURN_TYPES = ("FLOAT_FMT_MODEL", "FLOAT", "ADV_FLOAT_DICT", "INT")
+    RETURN_NAMES = ("float_fmt_model", "fps", "fmt_options_out", "conditioning_chunk_size")
     FUNCTION = "load_fmt_model"
 
     def load_fmt_model(self, fmt_file: str, target_device: str, cudnn_benchmark: bool,
@@ -865,4 +865,7 @@ class LoadFMTModel:
         if 'rank' in fmt_options_out:
             fmt_options_out['rank'] = str(fmt_options_out['rank'])
 
-        return (fmt_model, fps, fmt_options_out)
+        # The total size of the conditioning window for FMT is num_total_frames
+        conditioning_chunk_size = int(num_prev_frames + wav2vec_sec * fps)
+
+        return (fmt_model, fps, fmt_options_out, conditioning_chunk_size)

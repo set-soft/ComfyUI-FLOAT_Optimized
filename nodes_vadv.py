@@ -217,6 +217,10 @@ class FloatExtractEmotionWithCustomModel:
                     "default": "none",
                     "tooltip": "Select a specific emotion or 'none' to have the model predict the emotion from the "
                     "audio features."}),
+                "conditioning_chunk_size": ("INT", {
+                    "default": 60, "min": 1, "max": 4096,   # Default from BaseOptions: 10 + 2.0*25 = 60
+                    "tooltip": ("The size of the audio chunk (in feature frames) to process for emotion detection. "
+                                "Should match the FMT's conditioning window.")}),
             }
         }
 
@@ -227,7 +231,8 @@ class FloatExtractEmotionWithCustomModel:
 
     def extract_emotion_from_features(self, processed_audio_features: torch.Tensor,
                                       emotion_model_pipe: tuple,
-                                      emotion: str):
+                                      emotion: str,
+                                      conditioning_chunk_size: int):
         if not isinstance(emotion_model_pipe, tuple) or len(emotion_model_pipe) != 3:
             raise TypeError("emotion_model_pipe is not in the expected format (model, feature_extractor_ref, config_dict).")
 
@@ -731,3 +736,112 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
                 float_fmt_model.opt.emotion_dropout_prob = original_dropout_probs["emotion"]
                 logger.error(f"Error during VA ODE sampling: {e}")
                 raise
+
+
+class FloatExtractEmotionWithCustomModelDyn:
+    UNIQUE_NAME = "FloatExtractEmotionWithCustomModelDyn"
+    DISPLAY_NAME = "FLOAT Extract Emotion (Dynamic)"
+    DESCRIPTION = ("Generates a dynamic, time-varying emotion latent (we). It processes the audio in chunks to "
+                   "predict an emotion for each segment, creating a sequence of emotion vectors that can change "
+                   "over the duration of the clip.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        base_opts = BaseOptions()
+        return {
+            "required": {
+                "audio": ("AUDIO", {
+                    "tooltip": ("The raw ComfyUI audio input. Must be mono and at the correct sample rate for "
+                                "the emotion model.")
+                }),
+                "emotion_model_pipe": ("EMOTION_MODEL_PIPE", {
+                    "tooltip": "The loaded emotion recognition model pipe."
+                }),
+                # These inputs define the chunk size for emotion analysis
+                "target_fps": ("FLOAT", {
+                    "default": base_opts.fps, "min": 1.0, "max": 120.0, "step": 0.1,
+                    "tooltip": "Target video FPS. Used to map chunk-level emotions to a frame-level sequence."
+                }),
+                "chunk_duration_sec": ("FLOAT", {
+                    "default": base_opts.wav2vec_sec, "min": 0.5, "max": 10.0, "step": 0.1,
+                    "tooltip": "Duration of audio (in seconds) to analyze for each distinct emotion prediction."
+                }),
+            }
+        }
+
+    RETURN_TYPES = ("TORCH_TENSOR", "EMOTION_MODEL_PIPE", "TORCH_TENSOR")
+    RETURN_NAMES = ("we_latent_dynamic", "emotion_model_pipe_out", "emotion_sequence")
+    FUNCTION = "extract_dynamic_emotion"
+    CATEGORY = BASE_CATEGORY
+
+    def extract_dynamic_emotion(self, audio: Dict, emotion_model_pipe: tuple,
+                                target_fps: float, chunk_duration_sec: float):
+
+        emotion_model, feature_extractor_emo, model_config_emo = emotion_model_pipe
+        current_rank_device = emotion_model.target_device
+        expected_sr_emo = model_config_emo.get("sampling_rate", 16000)
+
+        # --- Input Audio Validation ---
+        if not isinstance(audio, dict) or "waveform" not in audio or "sample_rate" not in audio:
+            raise TypeError("Input 'audio' must be a ComfyUI AUDIO dictionary.")
+        input_waveform_batch = audio["waveform"]
+        input_sample_rate = audio["sample_rate"]
+
+        if input_sample_rate != expected_sr_emo:
+            raise ValueError(f"Input audio SR ({input_sample_rate}) must match emotion model's expected SR"
+                             f" ({expected_sr_emo}). Please resample upstream.")
+        if input_waveform_batch.ndim == 2:
+            input_waveform_batch = input_waveform_batch.unsqueeze(1)
+        if input_waveform_batch.shape[1] != 1:
+            raise ValueError("Input audio must be mono (1 channel).")
+
+        batch_size = input_waveform_batch.shape[0]
+        total_audio_samples = input_waveform_batch.shape[-1]
+
+        # --- Chunk the RAW AUDIO waveform ---
+        audio_chunk_size_samples = int(chunk_duration_sec * input_sample_rate)
+        if audio_chunk_size_samples == 0:
+            raise ValueError("Chunk duration is too small for the sample rate.")
+
+        num_chunks = math.ceil(total_audio_samples / audio_chunk_size_samples)
+        logger.info(f"Predicting emotion over {num_chunks} audio chunks of ~{chunk_duration_sec:.2f}s each.")
+
+        emotion_vectors_per_chunk = []
+        with model_to_target(emotion_model):
+            pbar = comfy.utils.ProgressBar(num_chunks * batch_size)
+            for b_idx in range(batch_size):
+                waveform_item = input_waveform_batch[b_idx].squeeze(0)  # Get (S,) tensor
+
+                for i in range(num_chunks):
+                    start_sample = i * audio_chunk_size_samples
+                    end_sample = start_sample + audio_chunk_size_samples
+                    audio_chunk_raw = waveform_item[start_sample:end_sample].cpu().numpy()
+
+                    # Preprocess ONLY the current audio chunk
+                    processed_chunk = feature_extractor_emo(
+                        audio_chunk_raw, sampling_rate=expected_sr_emo, return_tensors='pt', padding=True
+                    ).input_values.to(current_rank_device)
+
+                    # Now `processed_chunk` has sufficient length
+                    logits = emotion_model(input_values=processed_chunk).logits
+                    scores = F.softmax(logits, dim=-1)  # (1, NumLabels)
+                    emotion_vectors_per_chunk.append(scores)
+                    pbar.update(1)
+
+        # Shape: (B * NumChunks, NumLabels)
+        emotion_sequence = torch.cat(emotion_vectors_per_chunk,
+                                     dim=0).view(batch_size, num_chunks, emotion_model.config.num_labels)
+
+        # --- Map chunk emotions to frame emotions via nearest-neighbor upsampling ---
+        total_video_frames = math.ceil(total_audio_samples / input_sample_rate * target_fps)
+
+        if emotion_sequence.shape[1] > 1:  # More than one chunk to interpolate
+            emotion_sequence_permuted = emotion_sequence.transpose(1, 2)  # (B, NumLabels, NumChunks)
+            we_latent_gpu = F.interpolate(emotion_sequence_permuted, size=total_video_frames, mode='nearest')
+            we_latent_gpu = we_latent_gpu.transpose(1, 2)  # (B, TotalVideoFrames, NumLabels)
+        else:  # Only one chunk, just repeat it for all frames
+            we_latent_gpu = emotion_sequence.repeat(1, total_video_frames, 1)
+
+        logger.info(f"Generated dynamic 'we_latent' with final shape: {we_latent_gpu.shape}")
+
+        return (we_latent_gpu.cpu(), emotion_model_pipe, emotion_sequence)

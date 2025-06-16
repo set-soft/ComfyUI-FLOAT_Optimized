@@ -569,6 +569,7 @@ def _perform_ode_sampling_loop(
     prev_wa_batch = torch.zeros(batch_size, model_num_prev_frames, model_dim_w, device=target_device)
 
     total_num_chunks = math.ceil(audio_num_frames / model_num_frames_for_clip)
+    logger.debug(f"Sampling using {total_num_chunks} chunks")
     # The ProgressBar should ideally be managed by the calling node,
     # but for direct reuse, we can pass a total and update function or instantiate here.
     # For now, let's use comfy.utils.ProgressBar directly as in the original.
