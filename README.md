@@ -28,6 +28,8 @@ This project provides a ComfyUI wrapper of [FLOAT](https://github.com/deepbraina
 
 The code was optimized to reduce VRAM usage and avoid temporal files.
 
+If you don't know about FLOAT, want to understand more, and you don't want to read the paper, the following explanation might help you [Understanding FLOAT](doc/understanding_FLOAT.md)
+
 > [!WARNING]
 > **FLOAT is not for commercial use.**
 > Please refer to the licensing terms for more details.
