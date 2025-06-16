@@ -15,8 +15,9 @@ import comfy.utils
 import folder_paths
 
 from .options.base_options import BaseOptions
-from .utils.torch import get_torch_device_options
+from .utils.downloader import ensure_model_part_exists, look_for_models, look_for_model_dirs
 from .utils.misc import NODES_NAME
+from .utils.torch import get_torch_device_options
 from .models.misc import CHANNELS_MAP
 from .models.float.encoder import Encoder as FloatEncoderModule
 from .models.float.styledecoder import Synthesis as FloatSynthesisModule
@@ -29,6 +30,8 @@ PROJECTIONS_DIR = "float/audio_projections"
 MOTION_AE_DIR = "float/motion_autoencoder"
 FMT_SUBDIR = "float/fmt"
 ESPR = "wav2vec-english-speech-emotion-recognition"
+NODE_ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+UNIFIED_MODEL_PATH = os.path.join(folder_paths.models_dir, "float", "FLOAT.safetensors")
 
 
 def safe_parse_list_str(list_str: str, expected_type=int):
@@ -63,38 +66,13 @@ class LoadWav2VecModel:
 
     @classmethod
     def INPUT_TYPES(cls):
-        audio_models_path = os.path.join(folder_paths.models_dir, "audio")
-        if not os.path.isdir(audio_models_path):
-            # Attempt to create it, but don't fail if it doesn't exist yet,
-            # as the list might just show "No models found".
-            try:
-                os.makedirs(audio_models_path, exist_ok=True)
-            except OSError:
-                pass  # Oh well, list will be empty or show error.
-
-        model_folders = ["No models found in models/audio/"]  # Default if empty or path issue
-        if os.path.isdir(audio_models_path):
-            folders = []
-            for f_name in os.listdir(audio_models_path):
-                full_path = os.path.join(audio_models_path, f_name)
-                if os.path.isdir(full_path):
-                    # Check for common Hugging Face model files
-                    if os.path.exists(os.path.join(full_path, "config.json")) and \
-                        (os.path.exists(os.path.join(full_path, "pytorch_model.bin")) or
-                         os.path.exists(os.path.join(full_path, "model.safetensors")) or
-                         os.path.exists(os.path.join(full_path, "tf_model.h5"))):  # Added safetensors and tf
-                        folders.append(f_name)
-            if folders:  # If any valid folders were found
-                model_folders = sorted(folders)
-
+        model_folders = look_for_model_dirs("audio", "wav2vec2-base-960h")
         device_options = get_torch_device_options()
         default_device = "cuda" if "cuda" in device_options else "cpu"
-        default_model = "wav2vec2-base-960h" if "wav2vec2-base-960h" in model_folders else model_folders[0]
 
         return {
             "required": {
                 "model_folder": (model_folders, {
-                    "default": default_model,
                     "tooltip": "Name of the Hugging Face model folder located in ComfyUI/models/audio/"}),
                 "target_device": (device_options, {
                     "default": default_device,
@@ -115,10 +93,16 @@ class LoadWav2VecModel:
         # Import your custom model class
         from .models.wav2vec2 import Wav2VecModel as FloatWav2VecModel
 
-        if model_folder == "No models found in models/audio/":
-            raise FileNotFoundError("No Wav2Vec models found. Place Hugging Face model folders into 'ComfyUI/models/audio/'.")
-
         model_path = os.path.join(folder_paths.models_dir, "audio", model_folder)
+        weights_path = ensure_model_part_exists(
+            part_key="wav2vec2_base",  # Key from our constants dict
+            sub_dir=model_path,
+            file_name="model.safetensors",
+            unified_model_path=UNIFIED_MODEL_PATH,
+            node_root_path=NODE_ROOT_PATH
+        )
+        if weights_path is None or not os.path.exists(weights_path):
+            raise FileNotFoundError("No Wav2Vec models found. Place Hugging Face model folders into 'ComfyUI/models/audio/'.")
         if not os.path.isdir(model_path):
             raise FileNotFoundError(f"Selected model folder not found: {model_path}")
 
@@ -178,28 +162,17 @@ class LoadAudioProjectionLayer:
     DESCRIPTION = ("Loads weights for an audio projection layer from a .safetensors file. "
                    "It infers the input and output dimensions from the weights and constructs the layer, "
                    "which is used to project Wav2Vec features into the wa_latent space.")
+    DEFAULT_PROJECTION_FILENAME = "projection.safetensors"
 
     @classmethod
     def INPUT_TYPES(cls):
-        proj_models_path = os.path.join(folder_paths.models_dir, PROJECTIONS_DIR)
-        if not os.path.isdir(proj_models_path):
-            try:
-                os.makedirs(proj_models_path, exist_ok=True)
-            except OSError:
-                pass  # If it fails, the list will be empty.
-
-        projection_files = ["No projection files found"]
-        if os.path.isdir(proj_models_path):
-            files = [f for f in os.listdir(proj_models_path) if f.endswith(".safetensors")]
-            if files:
-                projection_files = sorted(files)
-
+        weight_files = look_for_models(PROJECTIONS_DIR, cls.DEFAULT_PROJECTION_FILENAME)
         device_options = get_torch_device_options()
         default_device = "cuda" if "cuda" in device_options else "cpu"
 
         return {
             "required": {
-                "projection_file": (projection_files, {
+                "projection_file": (weight_files, {
                     "tooltip": "The .safetensors file containing the pre-trained weights for the audio projection layer."}),
                 "target_device": (device_options, {
                     "default": default_device,
@@ -214,13 +187,14 @@ class LoadAudioProjectionLayer:
     CATEGORY = FILE_CATEGORY
 
     def load_projection_layer(self, projection_file: str, target_device: str):
-
-        if projection_file == "No projection files found":
-            raise FileNotFoundError("No .safetensors files found for audio projection. "
-                                    f"Place them in 'ComfyUI/models/{PROJECTIONS_DIR}/'.")
-
-        weights_path = os.path.join(folder_paths.models_dir, PROJECTIONS_DIR, projection_file)
-        if not os.path.exists(weights_path):
+        weights_path = ensure_model_part_exists(
+            part_key="projection",  # Key from our constants dict
+            sub_dir=PROJECTIONS_DIR,
+            file_name=projection_file,
+            unified_model_path=UNIFIED_MODEL_PATH,
+            node_root_path=NODE_ROOT_PATH
+        )
+        if weights_path is None or not os.path.exists(weights_path):
             raise FileNotFoundError(f"Projection weights file not found: {weights_path}")
 
         logger.info(f"Loading projection weights from {weights_path} to infer dimensions.")
@@ -293,33 +267,13 @@ class LoadEmotionRecognitionModel:
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Scan a dedicated folder or the general audio models folder
-        emotion_models_search_path = os.path.join(folder_paths.models_dir, "audio")  # Or "emotion_models"
-        if not os.path.isdir(emotion_models_search_path):
-            try:
-                os.makedirs(emotion_models_search_path, exist_ok=True)
-            except OSError:
-                pass
-
-        model_folders = ["No models found"]
-        if os.path.isdir(emotion_models_search_path):
-            folders = []
-            for f_name in os.listdir(emotion_models_search_path):
-                full_path = os.path.join(emotion_models_search_path, f_name)
-                if os.path.isdir(full_path) and os.path.exists(os.path.join(full_path, "config.json")):
-                    # Simple check, could be more specific for sequence classification models
-                    folders.append(f_name)
-            if folders:
-                model_folders = sorted(folders)
-
+        model_folders = look_for_model_dirs("audio", ESPR)
         device_options = get_torch_device_options()
         default_device = "cuda" if "cuda" in device_options else "cpu"
-        default_model = ESPR if ESPR in model_folders else model_folders[0]
 
         return {
             "required": {
                 "model_folder": (model_folders, {
-                    "default": default_model,
                     "tooltip": "Name of the speech emotion recognition model folder in ComfyUI/models/audio/"}),
                 "target_device": (device_options, {
                     "default": default_device,
@@ -337,11 +291,17 @@ class LoadEmotionRecognitionModel:
         from transformers import AutoConfig
         from .models.wav2vec2_ser import Wav2Vec2ForSpeechClassification
 
-        if model_folder == "No models found":
+        model_path = os.path.join(folder_paths.models_dir, "audio", model_folder)
+        weights_path = ensure_model_part_exists(
+            part_key="emotion_ser",  # Key from our constants dict
+            sub_dir=model_path,
+            file_name="model.safetensors",
+            unified_model_path=UNIFIED_MODEL_PATH,
+            node_root_path=NODE_ROOT_PATH
+        )
+        if weights_path is None or not os.path.exists(weights_path):
             raise FileNotFoundError("No emotion models found. Place Hugging Face model folders in "
                                     f"'{os.path.join(folder_paths.models_dir, 'audio')}'.")
-
-        model_path = os.path.join(folder_paths.models_dir, "audio", model_folder)  # Adjust if using a different subfolder
         if not os.path.isdir(model_path):
             raise FileNotFoundError(f"Selected model folder not found: {model_path}")
 
@@ -400,25 +360,7 @@ class LoadFloatEncoderModel:
 
     @classmethod
     def INPUT_TYPES(cls):
-        encoder_weights_path = os.path.join(folder_paths.models_dir, MOTION_AE_DIR)
-        if not os.path.isdir(encoder_weights_path):
-            try:
-                os.makedirs(encoder_weights_path, exist_ok=True)
-            except OSError:
-                pass
-
-        weight_files = []
-        if os.path.isdir(encoder_weights_path):
-            weight_files = sorted([f for f in os.listdir(encoder_weights_path) if f.endswith(".safetensors")])
-
-        if cls.DEFAULT_ENCODER_FILENAME in weight_files:
-            weight_files.remove(cls.DEFAULT_ENCODER_FILENAME)
-            weight_files.insert(0, cls.DEFAULT_ENCODER_FILENAME)
-        elif not weight_files:
-            weight_files.append("No encoder files found")
-        if not weight_files:  # Should not happen with logic above, but defensive
-            weight_files = ["No encoder files found"]
-
+        weight_files = look_for_models(MOTION_AE_DIR, cls.DEFAULT_ENCODER_FILENAME)
         device_options = get_torch_device_options()
         default_device = "cuda" if "cuda" in device_options else "cpu"
 
@@ -442,11 +384,15 @@ class LoadFloatEncoderModel:
     FUNCTION = "load_encoder_infer_arch"
 
     def load_encoder_infer_arch(self, encoder_file: str, target_device: str, cudnn_benchmark: bool):
-        if encoder_file == "No encoder files found":
-            raise FileNotFoundError(f"No encoder .safetensors files in 'models/{MOTION_AE_DIR}/'.")
 
-        weights_path = os.path.join(folder_paths.models_dir, MOTION_AE_DIR, encoder_file)
-        if not os.path.exists(weights_path):
+        weights_path = ensure_model_part_exists(
+            part_key="encoder",  # Key from our constants dict
+            sub_dir=MOTION_AE_DIR,
+            file_name=encoder_file,
+            unified_model_path=UNIFIED_MODEL_PATH,
+            node_root_path=NODE_ROOT_PATH
+        )
+        if weights_path is None or not os.path.exists(weights_path):
             raise FileNotFoundError(f"Encoder weights file not found: {weights_path}")
 
         logger.info(f"Loading Encoder weights from {weights_path} to infer architecture.")
@@ -550,24 +496,7 @@ class LoadFloatSynthesisModel:
 
     @classmethod
     def INPUT_TYPES(cls):
-        synth_weights_path = os.path.join(folder_paths.models_dir, MOTION_AE_DIR)
-        if not os.path.isdir(synth_weights_path):
-            try:
-                os.makedirs(synth_weights_path, exist_ok=True)
-            except OSError:
-                pass
-
-        weight_files = []  # Logic for file listing (same as LoadFloatEncoderModel)
-        if os.path.isdir(synth_weights_path):
-            weight_files = sorted([f for f in os.listdir(synth_weights_path) if f.endswith(".safetensors")])
-        if cls.DEFAULT_SYNTHESIS_FILENAME in weight_files:
-            weight_files.remove(cls.DEFAULT_SYNTHESIS_FILENAME)
-            weight_files.insert(0, cls.DEFAULT_SYNTHESIS_FILENAME)
-        elif not weight_files:
-            weight_files.append("No synthesis files found")
-        if not weight_files:
-            weight_files = ["No synthesis files found"]
-
+        weight_files = look_for_models(MOTION_AE_DIR, cls.DEFAULT_SYNTHESIS_FILENAME)
         device_options = get_torch_device_options()
         default_device = "cuda" if "cuda" in device_options else "cpu"
 
@@ -606,11 +535,14 @@ class LoadFloatSynthesisModel:
     def load_synthesis_infer_arch(self, synthesis_file: str, target_device: str,
                                   channel_multiplier: int, blur_kernel_str: str,
                                   cudnn_benchmark: bool):
-        if synthesis_file == "No synthesis files found":
-            raise FileNotFoundError(f"No synthesis .safetensors files in 'models/{MOTION_AE_DIR}/'.")
-
-        weights_path = os.path.join(folder_paths.models_dir, MOTION_AE_DIR, synthesis_file)
-        if not os.path.exists(weights_path):
+        weights_path = ensure_model_part_exists(
+            part_key="decoder",  # Key from our constants dict
+            sub_dir=MOTION_AE_DIR,
+            file_name=synthesis_file,
+            unified_model_path=UNIFIED_MODEL_PATH,
+            node_root_path=NODE_ROOT_PATH
+        )
+        if weights_path is None or not os.path.exists(weights_path):
             raise FileNotFoundError(f"Synthesis weights file not found: {weights_path}")
 
         try:
@@ -736,32 +668,7 @@ class LoadFMTModel:
 
     @classmethod
     def INPUT_TYPES(cls):
-        fmt_weights_path = os.path.join(folder_paths.models_dir, FMT_SUBDIR)
-        if not os.path.isdir(fmt_weights_path):
-            try:
-                os.makedirs(fmt_weights_path, exist_ok=True)
-            except OSError:
-                pass
-
-        weight_files = [cls.DEFAULT_FMT_FILENAME]
-        found_default = False
-        other_files_temp = []
-        if os.path.isdir(fmt_weights_path):
-            for f in os.listdir(fmt_weights_path):
-                if f.endswith(".safetensors"):
-                    if f == cls.DEFAULT_FMT_FILENAME:
-                        found_default = True
-                    else:
-                        other_files_temp.append(f)
-        if found_default:
-            weight_files.extend(sorted(other_files_temp))
-        elif other_files_temp:
-            weight_files = sorted(other_files_temp)
-        else:
-            weight_files = ["No FMT files found"]
-        if not weight_files:  # Should be redundant due to above logic
-            weight_files = ["No FMT files found"]
-
+        weight_files = look_for_models(FMT_SUBDIR, cls.DEFAULT_FMT_FILENAME)
         device_options = get_torch_device_options()
         default_device = "cuda" if "cuda" in device_options else "cpu"
 
@@ -811,11 +718,14 @@ class LoadFMTModel:
                        dim_e: int, num_heads: int, attention_window: int,
                        num_prev_frames: int, fps: float, wav2vec_sec: float):
 
-        if fmt_file == "No FMT files found":
-            raise FileNotFoundError(f"No FMT .safetensors files found in 'models/{FMT_SUBDIR}/'.")
-
-        weights_path = os.path.join(folder_paths.models_dir, FMT_SUBDIR, fmt_file)
-        if not os.path.exists(weights_path):
+        weights_path = ensure_model_part_exists(
+            part_key="fmt",  # Key from our constants dict
+            sub_dir=FMT_SUBDIR,
+            file_name=fmt_file,
+            unified_model_path=UNIFIED_MODEL_PATH,
+            node_root_path=NODE_ROOT_PATH
+        )
+        if weights_path is None or not os.path.exists(weights_path):
             raise FileNotFoundError(f"FMT weights file not found: {weights_path}")
 
         logger.info(f"Loading FMT state_dict from {weights_path} to CPU for inference and validation.")

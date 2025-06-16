@@ -109,7 +109,10 @@ Three *models* are needed.
 
 #### Very Advanced
 
-In order to use the nodes labeled **VA** (Very Advanced) you need to download:
+The current **VA** (Very Advanced) nodes can either download the components or extract them from
+the unified 2.4 GB file.
+
+But if you want to manually download them what the nodes needs is:
 
 1. The Wav2Vec 2.0 and Speech Emotion Recognition models described before (models/audio)
 2. The FLOAT individual parts found [here](https://huggingface.co/set-soft/float_advanced/tree/main)

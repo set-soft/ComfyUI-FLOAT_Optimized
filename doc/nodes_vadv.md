@@ -1,6 +1,8 @@
 # FLOAT (Very Advanced) Nodes Reference
 
-This document provides a reference for the "Very Advanced" (VA) nodes in the ComfyUI FLOAT Optimized integration. These nodes offer granular control over the model's pipeline, allowing users to swap out components like audio encoders, projection layers, and the core sampling model.
+This document provides a reference for the "Very Advanced" (VA) nodes in the ComfyUI FLOAT Optimized integration. These nodes offer maximum granular control over the model's pipeline by breaking it down into its constituent parts: loaders for each neural network component and "apply" nodes that perform a specific computation.
+
+This workflow is recommended for users who want to experiment with swapping out model parts (e.g., using a custom audio encoder), fine-tune every parameter, or deeply investigate the model's internal workings.
 
 [![FLOAT Encoder Architecture Diagram](nodes_vadv.jpg)](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_very_advanced.json)
 
@@ -8,21 +10,21 @@ This document provides a reference for the "Very Advanced" (VA) nodes in the Com
 
 **Jump to section:**
 - [Workflow Overview](#workflow-overview)
-- **Loader Nodes**
+- [Loader Nodes](#loader-nodes)
   - [LoadWav2VecModel](#loadwav2vecmodel)
   - [LoadAudioProjectionLayer](#loadaudioprojectionlayer)
   - [LoadEmotionRecognitionModel](#loademotionrecognitionmodel)
   - [LoadFloatEncoderModel](#loadfloatencodermodel)
   - [LoadFloatSynthesisModel](#loadfloatsynthesismodel)
   - [LoadFMTModel](#loadfmtmodel)
-- **"Apply" Nodes**
+- [Apply & Process Nodes](#apply--process-nodes)
+  - [FloatAudioPreprocessAndFeatureExtract](#floataudioprocessandfeatureextract)
+  - [FloatApplyAudioProjection](#floatapplyaudioprojection)
+  - [FloatExtractEmotionWithCustomModel](#floatextractemotionwithcustommodel)
   - [ApplyFloatEncoder](#applyfloatencoder)
   - [FloatGetIdentityReferenceVA](#floatgetidentityreferenceva)
-  - [FloatAudioPreprocessAndFeatureExtract](#floataudiopreprocessandfeatureextract)
-  - [FloatExtractEmotionWithCustomModel](#floatextractemotionwithcustommodel)
-  - [FloatApplyAudioProjection](#floatapplyaudioprojection)
-  - [FloatSampleMotionSequenceRD_VA](#floatsamplemotionsequencerd_va)
   - [ApplyFloatSynthesis](#applyfloatsynthesis)
+  - [FloatSampleMotionSequenceRD_VA](#floatsamplemotionsequencerd_va)
 
 ---
 
@@ -37,26 +39,28 @@ The "Very Advanced" workflow decouples the main `float_pipe` into its constituen
 **Sampling Path:** (Outputs from above paths) → `LoadFMTModel` → `FloatSampleMotionSequenceRD_VA`
 **Decoding Path:** (Outputs from Image & Sampling paths) → `LoadFloatSynthesisModel` → `ApplyFloatSynthesis`
 
-## Loader Nodes (`nodes_adv_loader.py`)
+## Loader Nodes
 
-These nodes are responsible for loading pre-trained model components from disk.
+Source: `nodes_adv_loader.py`
+
+These nodes are responsible for loading pre-trained model components from disk into memory. They typically reside in the `FLOAT/Very Advanced/Loaders` category.
 
 ### `LoadWav2VecModel`
 - **Display Name:** Load Wav2Vec Model (for Audio Encoding) (VA)
 - **Description:** Loads a standard Wav2Vec2-type model and its feature extractor. The model is wrapped in the custom `FloatWav2VecModel` class, which handles internal time-domain interpolation required for generating audio content features (`wa_latent`).
 - **Inputs:**
   - `model_folder`: (Dropdown) Name of the Hugging Face model folder located in `ComfyUI/models/audio/`.
-  - `target_device`: (Dropdown) The device (CPU or CUDA) where the model will be targeted for computation.
+  - `target_device`: (Dropdown) The device (CPU or CUDA) to which the model's weights will be assigned for computation.
 - **Outputs:**
   - `sampling_rate`: (INT) The sample rate expected by the loaded model (e.g., 16000).
-  - `wav2vec_pipe`: (WAV2VEC_PIPE) A pipe containing the loaded model instance and its feature extractor.
+  - `wav2vec_pipe`: (WAV2VEC_PIPE) A pipe containing the loaded `FloatWav2VecModel` instance and its feature extractor.
 
 ### `LoadAudioProjectionLayer`
 - **Display Name:** Load Audio Projection Layer (VA)
 - **Description:** Loads weights for an audio projection layer from a `.safetensors` file. It infers the input and output dimensions from the weights and constructs the `nn.Sequential` layer, which is used to project Wav2Vec features into the `wa_latent` space.
 - **Inputs:**
   - `projection_file`: (Dropdown) The `.safetensors` file from `ComfyUI/models/float/audio_projections/`.
-  - `target_device`: (Dropdown) The device (CPU or CUDA) where the layer will be targeted for computation.
+  - `target_device`: (Dropdown) The device (CPU or CUDA) to which the projection layer will be assigned for computation.
 - **Outputs:**
   - `projection_layer`: (AUDIO_PROJECTION_LAYER) The loaded `nn.Module`.
   - `inferred_input_dim`: (INT) The feature dimension the layer expects as input.
@@ -67,7 +71,7 @@ These nodes are responsible for loading pre-trained model components from disk.
 - **Description:** Loads a Wav2Vec2-based Speech Emotion Recognition (SER) model. It uses the specific `Wav2Vec2ForSpeechClassification` class required by FLOAT and outputs the model pipe along with the number of emotion classes (`dim_e`) inferred from the model's configuration.
 - **Inputs:**
   - `model_folder`: (Dropdown) Name of the SER model folder in `ComfyUI/models/audio/`.
-  - `target_device`: (Dropdown) The device (CPU or CUDA) where the model will be targeted for computation.
+  - `target_device`: (Dropdown) The device (CPU or CUDA) to which the emotion model will be assigned for computation.
 - **Outputs:**
   - `emotion_model_pipe`: (EMOTION_MODEL_PIPE) A pipe containing the loaded model, its feature extractor, and config.
   - `dim_e`: (INT) The number of emotion classes this model predicts.
@@ -120,7 +124,9 @@ These nodes are responsible for loading pre-trained model components from disk.
 
 ---
 
-## "Apply" Nodes (`nodes_vadv.py`)
+## "Apply" & Process Nodes
+
+Source: `nodes_vadv.py`
 
 These nodes perform computations using the models loaded by the loader nodes.
 
@@ -128,10 +134,10 @@ These nodes perform computations using the models loaded by the loader nodes.
 - **Display Name:** Apply FLOAT Encoder (VA)
 - **Description:** Applies the loaded FLOAT Encoder to a batch of reference images. It preprocesses the images and passes them through the encoder to extract the core appearance latent and multi-scale feature maps, which are bundled into a single Appearance Pipe.
 - **Inputs:**
-  - `ref_image`: (IMAGE) A batch of reference images, correctly sized for the encoder.
-  - `float_encoder`: (FLOAT_ENCODER_MODEL) The loaded FLOAT Encoder module.
+  - `ref_image`: (IMAGE) A batch of reference images, correctly sized (e.g., 512x512) for the encoder.
+  - `float_encoder`: (FLOAT_ENCODER_MODEL) The loaded FLOAT Encoder model module.
 - **Outputs:**
-  - `appearance_pipe (Wsr)`: (FLOAT_APPEARANCE_PIPE) A pipe containing the appearance latent (`h_source` / `s_r`) and the list of feature maps (`feats`).
+  - `appearance_pipe (Ws→r)`: (FLOAT_APPEARANCE_PIPE) A pipe containing the appearance latent (`h_source` / `s_r`) and the list of feature maps (`feats`).
   - `r_s_lambda_latent`: (TORCH_TENSOR) The motion control parameters (`h_motion`).
   - `float_encoder_out`: (FLOAT_ENCODER_MODEL) Passthrough of the input encoder.
 
@@ -139,8 +145,8 @@ These nodes perform computations using the models loaded by the loader nodes.
 - **Display Name:** FLOAT Get Identity Reference (VA)
 - **Description:** Derives the identity-specific motion reference latent (`r_s`) from the motion control parameters (`r_s_lambda`). This node uses the `direction` module within the loaded Synthesis/Decoder model to perform the transformation, creating a key conditioning signal for the FMT sampler.
 - **Inputs:**
-  - `r_s_lambda_latent`: (TORCH_TENSOR) The motion control parameters output by the FLOAT Encoder.
-  - `float_synthesis`: (FLOAT_SYNTHESIS_MODEL) The loaded FLOAT Synthesis (Decoder) model, which contains the `direction` module.
+  - `r_s_lambda_latent`: (TORCH_TENSOR) The motion control parameters (`h_motion`) output by the FLOAT Encoder.
+  - `float_synthesis`: (FLOAT_SYNTHESIS_MODEL) The loaded FLOAT Synthesis (Decoder) model, which contains the `direction` module needed for this transformation.
 - **Outputs:**
   - `float_synthesis_out`: (FLOAT_SYNTHESIS_MODEL) Passthrough of the input synthesis model.
   - `r_s_latent (Wr→s)`: (TORCH_TENSOR) The final reference identity latent (`wr` or `r_s`).
@@ -150,13 +156,13 @@ These nodes perform computations using the models loaded by the loader nodes.
 - **Description:** Processes a batch of pre-validated (mono, correct SR) audio. It applies the feature extractor from the loaded Wav2Vec pipe, runs the audio through the Wav2Vec model, and interpolates the resulting features to match the target video FPS, making them ready for projection.
 - **Inputs:**
   - `audio`: (AUDIO) The raw ComfyUI audio input. Must be mono and have the correct sample rate required by the Wav2Vec pipe.
-  - `wav2vec_pipe`: (WAV2VEC_PIPE) The loaded Wav2Vec pipe.
-  - `target_fps`: (FLOAT) The target video FPS.
-  - `only_last_features`: (BOOLEAN) If True, use features from the last transformer layer. If False, concatenate features from all layers.
+  - `wav2vec_pipe`: (WAV2VEC_PIPE) The loaded Wav2Vec pipe, containing the model, feature extractor, and options.
+  - `target_fps`: (FLOAT) The target video frames-per-second. Used to calculate the final number of feature frames.
+  - `only_last_features`: (BOOLEAN) If True, use only the features from the last transformer layer. If False, concatenate features from all transformer layers, resulting in a much larger feature dimension.
 - **Outputs:**
   - `wav2vec_features`: (TORCH_TENSOR) The final feature tensors ready for the projection layer.
   - `audio_num_frames`: (INT) The total number of video frames corresponding to the audio length.
-  - `processed_audio_features`: (TORCH_TENSOR) The audio features *before* the main Wav2Vec model, to be used by the emotion model.
+  - `processed_audio_features`: (TORCH_TENSOR) The audio features *after* the feature extractor (but before the main Wav2Vec model), ready to be used by the emotion model.
   - `wav2vec_pipe_out`: (WAV2VEC_PIPE) Passthrough of the input pipe.
 
 ### `FloatApplyAudioProjection`
@@ -172,9 +178,9 @@ These nodes perform computations using the models loaded by the loader nodes.
 - **Display Name:** FLOAT Extract Emotion from Features (VA)
 - **Description:** Generates the emotion conditioning latent (`we`). If an emotion is specified, it creates a one-hot encoded tensor. If set to 'none', it predicts the emotion from the provided preprocessed audio features using the loaded custom emotion recognition model.
 - **Inputs:**
-  - `processed_audio_features`: (TORCH_TENSOR) The batch of preprocessed audio features from `FloatAudioPreprocessAndFeatureExtract`.
+  - `processed_audio_features`: (TORCH_TENSOR) The batch of preprocessed audio features, output by a feature extractor like the one in `FloatAudioPreprocessAndFeatureExtract`.
   - `emotion_model_pipe`: (EMOTION_MODEL_PIPE) The loaded emotion recognition model pipe.
-  - `emotion`: (Dropdown) Select a specific emotion or 'none' to predict from audio.
+  - `emotion`: (Dropdown) Select a specific emotion or 'none' to have the model predict the emotion from the audio features.
 - **Outputs:**
   - `we_latent`: (TORCH_TENSOR) The final emotion conditioning latent.
   - `emotion_model_pipe_out`: (EMOTION_MODEL_PIPE) Passthrough of the input pipe.
