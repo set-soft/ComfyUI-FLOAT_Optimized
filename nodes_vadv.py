@@ -638,6 +638,8 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
         model_num_prev_frames = construction_opts_source.num_prev_frames
         # num_frames_for_clip depends on fps and wav2vec_sec used during FMT construction
         model_num_frames_for_clip = int(construction_opts_source.wav2vec_sec * construction_opts_source.fps)
+        logger.debug(f"Using {model_num_frames_for_clip} frames for clip and {model_num_prev_frames} previous frames."
+                     f"Total {model_num_frames_for_clip+model_num_prev_frames} frames conditioning")
         model_dim_w = construction_opts_source.dim_w
 
         target_device_for_sampling = float_fmt_model.target_device  # Get device from model
