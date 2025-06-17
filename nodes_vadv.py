@@ -219,10 +219,6 @@ class FloatExtractEmotionWithCustomModel:
                     "default": "none",
                     "tooltip": "Select a specific emotion or 'none' to have the model predict the emotion from the "
                     "audio features."}),
-                "conditioning_chunk_size": ("INT", {
-                    "default": 60, "min": 1, "max": 4096,   # Default from BaseOptions: 10 + 2.0*25 = 60
-                    "tooltip": ("The size of the audio chunk (in feature frames) to process for emotion detection. "
-                                "Should match the FMT's conditioning window.")}),
             }
         }
 
@@ -233,8 +229,7 @@ class FloatExtractEmotionWithCustomModel:
 
     def extract_emotion_from_features(self, processed_audio_features: torch.Tensor,
                                       emotion_model_pipe: tuple,
-                                      emotion: str,
-                                      conditioning_chunk_size: int):
+                                      emotion: str):
         if not isinstance(emotion_model_pipe, tuple) or len(emotion_model_pipe) != 3:
             raise TypeError("emotion_model_pipe is not in the expected format (model, feature_extractor_ref, config_dict).")
 
