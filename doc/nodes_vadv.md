@@ -21,6 +21,7 @@ This workflow is recommended for users who want to experiment with swapping out 
   - [FloatAudioPreprocessAndFeatureExtract](#floataudioprocessandfeatureextract)
   - [FloatApplyAudioProjection](#floatapplyaudioprojection)
   - [FloatExtractEmotionWithCustomModel](#floatextractemotionwithcustommodel)
+  - [FloatExtractEmotionWithCustomModelDyn](#floatextractemotionwithcustommodeldyn)
   - [ApplyFloatEncoder](#applyfloatencoder)
   - [FloatGetIdentityReferenceVA](#floatgetidentityreferenceva)
   - [ApplyFloatSynthesis](#applyfloatsynthesis)
@@ -34,7 +35,7 @@ The "Very Advanced" workflow decouples the main `float_pipe` into its constituen
 
 **Image Path:** `LoadFloatEncoderModel` → `ApplyFloatEncoder`
 **Audio Path:** `LoadWav2VecModel` → `FloatAudioPreprocessAndFeatureExtract` → `LoadAudioProjectionLayer` → `FloatApplyAudioProjection`
-**Emotion Path:** `LoadEmotionRecognitionModel` → `FloatExtractEmotionWithCustomModel`
+**Emotion Path:** `LoadEmotionRecognitionModel` → `FloatExtractEmotionWithCustomModel`/`FloatExtractEmotionWithCustomModelDyn`
 **Identity Path:** `ApplyFloatEncoder` → `LoadFloatSynthesisModel` → `FloatGetIdentityReferenceVA`
 **Sampling Path:** (Outputs from above paths) → `LoadFMTModel` → `FloatSampleMotionSequenceRD_VA`
 **Decoding Path:** (Outputs from Image & Sampling paths) → `LoadFloatSynthesisModel` → `ApplyFloatSynthesis`
@@ -164,6 +165,8 @@ These nodes perform computations using the models loaded by the loader nodes.
   - `audio_num_frames`: (INT) The total number of video frames corresponding to the audio length.
   - `processed_audio_features`: (TORCH_TENSOR) The audio features *after* the feature extractor (but before the main Wav2Vec model), ready to be used by the emotion model.
   - `wav2vec_pipe_out`: (WAV2VEC_PIPE) Passthrough of the input pipe.
+  - `audio`: (AUDIO) Passthrough of the input audio.
+  - `fps`: (FLOAT) Passthrough of the input target_fps.
 
 ### `FloatApplyAudioProjection`
 - **Display Name:** FLOAT Apply Audio Projection (VA)
@@ -184,6 +187,19 @@ These nodes perform computations using the models loaded by the loader nodes.
 - **Outputs:**
   - `we_latent`: (TORCH_TENSOR) The final emotion conditioning latent.
   - `emotion_model_pipe_out`: (EMOTION_MODEL_PIPE) Passthrough of the input pipe.
+
+### `FloatExtractEmotionWithCustomModelDyn`
+
+- **Display Name:** FLOAT Extract Emotion (Dynamic) (VA)
+- **Description:** Generates a dynamic, time-varying emotion conditioning latent (`we`). It processes the raw audio in chunks to predict an emotion for each segment. The resulting sequence of emotion vectors allows the facial expression to change over the duration of the clip, following the emotional tone of the audio.
+- **Inputs:**
+  - `audio`: (AUDIO) The raw ComfyUI audio input. **Note:** This node performs its own preprocessing; the audio must be mono and at the sample rate expected by the loaded emotion model.
+  - `emotion_model_pipe`: (EMOTION_MODEL_PIPE) The loaded emotion recognition model pipe from the `LoadEmotionRecognitionModel` node.
+  - `target_fps`: (FLOAT) The target video frames-per-second. This is used to correctly map the chunk-level emotion predictions to a final frame-level sequence.
+  - `chunk_duration_sec`: (FLOAT) The duration of audio (in seconds) to analyze for each distinct emotion prediction. A smaller value (e.g., 1.0-2.0s) allows for more rapid emotional shifts.
+- **Outputs:**
+  - `we_latent_dynamic`: (TORCH_TENSOR) The final time-varying emotion latent, with shape `(Batch, TotalFrames, EmotionDim)`. This is ready to be used by the advanced sampler.
+  - `emotion_model_pipe_out`: (EMOTION_MODEL_PIPE) Passthrough of the input emotion model pipe for chaining.
 
 ### `FloatSampleMotionSequenceRD_VA`
 - **Display Name:** Sample Motion Sequence RD (VA)

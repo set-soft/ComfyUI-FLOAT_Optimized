@@ -52,8 +52,8 @@ class FloatAudioPreprocessAndFeatureExtract:
             }
         }
 
-    RETURN_TYPES = ("TORCH_TENSOR", "INT", "TORCH_TENSOR", "WAV2VEC_PIPE")
-    RETURN_NAMES = ("wav2vec_features", "audio_num_frames", "processed_audio_features", "wav2vec_pipe_out")
+    RETURN_TYPES = ("TORCH_TENSOR", "INT", "TORCH_TENSOR", "WAV2VEC_PIPE", "AUDIO", "FLOAT")
+    RETURN_NAMES = ("wav2vec_features", "audio_num_frames", "processed_audio_features", "wav2vec_pipe_out", "audio", "fps")
     FUNCTION = "extract_features_with_custom_model"
     CATEGORY = BASE_CATEGORY
 
@@ -139,7 +139,9 @@ class FloatAudioPreprocessAndFeatureExtract:
         return (wav2vec_features_gpu.cpu(),
                 audio_num_frames,
                 preprocessed_audio_batched_cpu.cpu(),
-                wav2vec_pipe)
+                wav2vec_pipe,
+                audio,
+                target_fps)
 
 
 class FloatApplyAudioProjection:

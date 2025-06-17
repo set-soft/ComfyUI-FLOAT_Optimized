@@ -555,6 +555,8 @@ def _perform_ode_sampling_loop(
     """
 
     batch_size = wa_latent_dev.shape[0]
+    is_we_dynamic = we_latent_dev.shape[1] > 1
+    model_dim_e = we_latent_dev.shape[2]
 
     current_odeint_kwargs = {
         'atol': ode_atol,
@@ -567,6 +569,7 @@ def _perform_ode_sampling_loop(
     # Initialize prev_x_batch and prev_wa_batch for the first chunk
     prev_x_batch = torch.zeros(batch_size, model_num_prev_frames, model_dim_w, device=target_device)
     prev_wa_batch = torch.zeros(batch_size, model_num_prev_frames, model_dim_w, device=target_device)
+    prev_we_batch = torch.zeros(batch_size, model_num_prev_frames, model_dim_e, device=target_device)
 
     total_num_chunks = math.ceil(audio_num_frames / model_num_frames_for_clip)
     logger.debug(f"Sampling using {total_num_chunks} chunks")
@@ -591,6 +594,17 @@ def _perform_ode_sampling_loop(
             padding_size = model_num_frames_for_clip - current_chunk_len
             wa_chunk_batch = F.pad(wa_chunk_batch, (0, 0, 0, padding_size), mode='replicate')
 
+        # --- Slice we_chunk_batch if dynamic ---
+        if is_we_dynamic:
+            we_chunk_batch = we_latent_dev[:, start_idx:end_idx, :]
+            # Pad if necessary
+            if we_chunk_batch.shape[1] < model_num_frames_for_clip:
+                padding_size = model_num_frames_for_clip - we_chunk_batch.shape[1]
+                we_chunk_batch = F.pad(we_chunk_batch, (0, 0, 0, padding_size), mode='replicate')
+        else:
+            # If static, just pass the original (B, 1, E) tensor
+            we_chunk_batch = we_latent_dev
+
         def fmt_ode_func_batch(t_scalar, current_x_batch):
             # Ensure t_scalar is correctly shaped for fmt.forward_with_cfv
             # (which expects a scalar or a (B,) tensor for its 't' arg, then unsqueezes)
@@ -608,9 +622,10 @@ def _perform_ode_sampling_loop(
                 x=current_x_batch,
                 wa=wa_chunk_batch,
                 wr=r_s_latent_dev,
-                we=we_latent_dev,
+                we=we_chunk_batch,
                 prev_x=prev_x_batch,
                 prev_wa=prev_wa_batch,
+                prev_we=prev_we_batch,
                 a_cfg_scale=a_cfg_scale,
                 r_cfg_scale=r_cfg_scale,
                 e_cfg_scale=e_cfg_scale,
@@ -636,6 +651,18 @@ def _perform_ode_sampling_loop(
         else:  # Should not happen
             prev_wa_batch = F.pad(wa_chunk_batch, (0, 0, 0, model_num_prev_frames - wa_chunk_batch.shape[1]),
                                   mode='replicate')[:, -model_num_prev_frames:, :]
+
+        # Update prev_we_batch
+        # For both static and dynamic `we`, we must provide a `prev_we`.
+        # If static, the `prev_we` will just be the static `we` repeated.
+        # If dynamic, it's the slice from the end of the current chunk.
+        # The logic inside FMT.forward handles the repetition if we give it a static `we_chunk_batch`.
+        # However, it's cleaner to handle it here.
+        if is_we_dynamic:
+            prev_we_batch = we_chunk_batch[:, -model_num_prev_frames:]
+        else:  # we is static (B, 1, E)
+            # Create a prev_we that is also the static emotion
+            prev_we_batch = we_chunk_batch.repeat(1, model_num_prev_frames, 1)
 
         comfy_pbar.update(1)  # Update progress bar
 

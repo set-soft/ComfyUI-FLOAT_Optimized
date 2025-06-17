@@ -274,7 +274,7 @@ class FlowMatchingTransformer(BaseModel):
             sequence[batch_id_for_drop] = 0
         return sequence
 
-    def forward(self, t, x, wa, wr, we, prev_x=None, prev_wa=None, train=True, **kwargs) -> torch.Tensor:
+    def forward(self, t, x, wa, wr, we, prev_x=None, prev_wa=None, prev_we=None, train=True, **kwargs) -> torch.Tensor:
         """
         Forward pass of ConditionalFlowMatchingTransformer.
 
@@ -300,17 +300,35 @@ class FlowMatchingTransformer(BaseModel):
 
         # previous condition encoding
         if prev_x is not None:
+            # Check caller consistency
+            if prev_wa is None:
+                raise ValueError("prev_x was provided, but prev_wa was not.")
+            if we.shape[1] > 1 and prev_we is None:
+                raise ValueError("`we` is dynamic (T>1), but prev_we was not provided with prev_x/prev_wa.")
+
             prev_x = self.sequence_embedder(prev_x,  dropout_prob=0.5, train=train)
             prev_wa = self.sequence_embedder(prev_wa, dropout_prob=0.5, train=train)
 
             x = torch.cat([prev_x, x], dim=1)
             wa = torch.cat([prev_wa, wa], dim=1)
+            if we.shape[1] > 1:  # Only concatenate `we` if it's dynamic
+                if prev_we is None:
+                    raise ValueError("Dynamic `we` requires `prev_we`.")
+                we = torch.cat([prev_we, we], dim=1)
 
         x = self.x_embedder(x)
         x = x + self.pos_embed      # (N, L + L', D), where T = opt.wav2vec_sec * opt.fps, D = dim_w
 
         wr = wr.repeat(1, wa.shape[1], 1)
-        we = we.repeat(1, wa.shape[1], 1)
+
+        # Adjust we
+        if we.shape[1] == 1:  # Static emotion (B, 1, DimE)
+            we = we.repeat(1, wa.shape[1], 1)  # Broadcast it across time, original behavior
+        elif we.shape[1] != wa.shape[1]:
+            # This is an error case for dynamic emotion. Time dimensions must match.
+            raise ValueError(f"Dynamic emotion latent `we` time dimension ({we.shape[1]}) does not match "
+                             f"audio latent `wa` time dimension ({wa.shape[1]}).")
+        # If we.shape[1] == wa.shape[1], we is already correctly shaped (B, T, DimE), so do nothing.
 
         c = torch.cat([wr, wa, we], dim=-1)
         c = self.c_embedder(c)
@@ -322,12 +340,21 @@ class FlowMatchingTransformer(BaseModel):
         return self.decoder(x, c)
 
     @torch.no_grad()
-    def forward_with_cfv(self, t, x, wa, wr, we, prev_x, prev_wa, a_cfg_scale=1.0, r_cfg_scale=1.0, e_cfg_scale=1.0,
+    def forward_with_cfv(self, t, x, wa, wr, we, prev_x, prev_wa, prev_we=None,
+                         a_cfg_scale=1.0, r_cfg_scale=1.0, e_cfg_scale=1.0,
                          include_r_cfg=False, **kwargs) -> torch.Tensor:
         if a_cfg_scale != 1.0 or r_cfg_scale != 1.0 or e_cfg_scale != 1.0:
             null_wa = torch.zeros_like(wa)
             null_we = torch.zeros_like(we)
             null_wr = torch.zeros_like(wr)
+
+            # Handle prev_we batching
+            # `prev_we` should only exist if `we` is dynamic.
+            # If `we` is static, `prev_we` can be considered all zeros or just like the static `we`.
+            prev_we_cat = None
+            if prev_we is not None:
+                # Create a null version of prev_we for CFG
+                null_prev_we = torch.zeros_like(prev_we)
 
             if not include_r_cfg:
                 audio_cat = torch.cat([null_wa, wa, wa], dim=0)           # concat along batch
@@ -337,8 +364,13 @@ class FlowMatchingTransformer(BaseModel):
 
                 prev_x_cat = torch.cat([prev_x, prev_x, prev_x], dim=0)
                 prev_wa_cat = torch.cat([prev_wa, prev_wa, prev_wa], dim=0)
+                # Setup for prev_we_cat
+                if prev_we is not None:
+                    # Same pattern as emotion_cat
+                    prev_we_cat = torch.cat([null_prev_we, prev_we, null_prev_we], dim=0)
 
-                model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, train=False)
+                model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, prev_we_cat,
+                                            train=False)
                 # uncond: wr  all_cond: wa+wr+we   audio_uncond_emotion: wa+wr
                 uncond, all_cond, audio_uncond_emotion = torch.chunk(model_output, chunks=3, dim=0)
 
@@ -354,11 +386,16 @@ class FlowMatchingTransformer(BaseModel):
 
                 prev_x_cat = torch.cat([prev_x, prev_x, prev_x, prev_x], dim=0)
                 prev_wa_cat = torch.cat([prev_wa, prev_wa, prev_wa, prev_wa], dim=0)
+                # Setup for prev_we_cat
+                if prev_we is not None:
+                    # Same pattern as emotion_cat
+                    prev_we_cat = torch.cat([null_prev_we, null_prev_we, prev_we, null_prev_we], dim=0)
 
-                model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, train=False)
+                model_output = self.forward(t, x, audio_cat, ref_cat, emotion_cat, prev_x_cat, prev_wa_cat, prev_we_cat,
+                                            train=False)
                 truly_uncond, uncond, all_cond, audio_uncond_emotion = torch.chunk(model_output, chunks=4, dim=0)
 
                 return (truly_uncond + r_cfg_scale * (uncond - truly_uncond) + a_cfg_scale * (audio_uncond_emotion - uncond) +
                         e_cfg_scale * (all_cond - audio_uncond_emotion))
         else:
-            return self.forward(t, x, wa, wr, we, prev_x, prev_wa, train=False)
+            return self.forward(t, x, wa, wr, we, prev_x, prev_wa, prev_we, train=False)
