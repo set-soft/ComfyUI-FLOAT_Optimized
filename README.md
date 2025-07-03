@@ -8,20 +8,21 @@
 </div>
 
 **Table of Contents**
-1. [Installation](#-installation)
-2. [Usage](#%EF%B8%8F-usage)
-3. [Manual Models Download](#-manual-models-download)
+1. &#x0001F680; [Installation](#-installation)
+2. &#x2600;&#xFE0F; [Usage](#&#xFE0F;-usage)
+3. &#128190; [Manual Models Download](#-manual-models-download)
    - [Simple](#simple)
    - [Flexible](#flexible)
    - [Very Advanced](#very-advanced)
-4. [Nodes](#-nodes)
+4. &#128218; [Nodes](#-nodes)
    - [Load FLOAT Models (Opt)](#load-float-models-opt)
    - [FLOAT Process (Opt)](#float-process-opt)
    - [FLOAT Advanced Options](#float-advanced-options)
-5. [Debugging](#-debugging)
-6. [Citation](#-citation-of-the-paper)
-7. [Attributions](#-attributions)
-8. [License](#%EF%B8%8F-license)
+5. &#128030; [Debugging](#-debugging)
+6. &#x0001F4DC; [Project History](#-project-history)
+7. &#128279; [Citation](#-citation-of-the-paper)
+8. &#128101; [Attributions](#-attributions)
+9. &COPY;&#xFE0F; [License](#&#xFE0F;-license)
 ---
 
 This project provides a ComfyUI wrapper of [FLOAT](https://github.com/deepbrainai-research/float) for Generative Motion Latent Flow Matching for Audio-driven Talking Portrait
@@ -38,7 +39,7 @@ If you don't know about FLOAT, want to understand more, and you don't want to re
 [![FLOAT Encoder Architecture Diagram](doc/nodes.jpg)](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow.json)
 
 
-## 🚀 Installation
+## &#x0001F680; Installation
 
 ```bash
 git clone https://github.com/set-soft/ComfyUI-FLOAT_Optimized.git
@@ -51,7 +52,7 @@ Note:
   This dependency isn't listed to avoid messing with it, which delicated.
 - I tested the nodes using an RTX3060 with 12 GB of VRAM and 32 GB of RAM, in addition I have 32 GB of swap (virtual RAM).
 
-## ☀️ Usage
+## &#x2600;&#xFE0F; Usage
 
 - Load [example workflow](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow.json)
 - Upload driving image and audio, click queue.
@@ -193,6 +194,19 @@ When you face problems you can ask these nodes to show more information.
 - If you just want extra information for these nodes you can define the `FLOAT_OPTIMIZED_NODES_DEBUG` environment variable to `1`.
   This will show extra information related to FLOAT nodes.
 - If you want even more information use `2` or `3` for the environment variable.
+
+
+## &#x0001F4DC; Project History
+
+- 1.0.0 2025-06-14: Initial release
+  - Optimized
+  - Advanced nodes
+  - Very advanced nodes
+
+- 1.1.0 2025-07-03: Dynamic Emotion and fixes
+  - Fixed support for broken Transformers (default attn_implementation is incompatible)
+  - Fixed support for Apple Silicon Macs (#2)
+  - Added dynamic emotions handling (experimental)
 
 
 ## &#128279; Citation of the paper
