@@ -6,6 +6,7 @@
     "Wav2Vec2ForCTC"
   ],
   "attention_dropout": 0.1,
+  "attn_implementation": "eager",
   "bos_token_id": 1,
   "codevector_dim": 256,
   "contrastive_logits_temperature": 0.1,
