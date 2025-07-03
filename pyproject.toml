@@ -1,7 +1,7 @@
 [project]
 name = "float-optimized"
-description = "FLOAT Talking Portrait (image+audio to talking video) Optimize nodes. FLOAT is the Generative Motion Latent Flow Matching for Audio-driven Talking Portrait. It can animate an image using an audio. Nodes from simple to complex are provided. Optimized for low VRAM and supporting the use of one single file model. You can also experiment with very advanced nodes."
-version = "1.0.0"
+description = "FLOAT Talking Portrait (image+audio to talking video) Optimize nodes. FLOAT is the Generative Motion Latent Flow Matching for Audio-driven Talking Portrait. It can animate an image using an audio. Nodes from simple to complex are provided. Optimized for low VRAM and supporting the use of one single file model. You can also experiment with very advanced nodes and dynamic emotions."
+version = "1.1.0"
 license = { file = "LICENSE.md" }
 dependencies = []
 
