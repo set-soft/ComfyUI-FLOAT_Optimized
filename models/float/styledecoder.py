@@ -406,7 +406,11 @@ class ToFlow(nn.Module):
         xs = np.stack(xs, 2)
 
         target_device = input.device
-        xs = torch.tensor(xs, requires_grad=False, device=target_device).float().unsqueeze(0).repeat(input.size(0), 1, 1, 1)
+        # Apple Silicon here uses float64, so we need to force 32 bits to match the rest
+        # Not sure from where comes the issue and don't have access to Apple Silicon, but this
+        # cast seems to be enough, see issue #2
+        xs = torch.tensor(xs, dtype=torch.float32, requires_grad=False,
+                          device=target_device).float().unsqueeze(0).repeat(input.size(0), 1, 1, 1)
 
         if skip is not None:
             skip = self.upsample(skip)
