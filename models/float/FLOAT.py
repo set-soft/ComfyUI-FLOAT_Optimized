@@ -324,7 +324,9 @@ class AudioEncoder(BaseModel):
         else:
             # Load with weights
             logger.debug(f"AudioEncoder: Initializing from {opt.wav2vec_model_path}")
-            self.wav2vec2 = Wav2VecModel.from_pretrained(opt.wav2vec_model_path, local_files_only=True)
+            # Note: we need access to the attentions
+            self.wav2vec2 = Wav2VecModel.from_pretrained(opt.wav2vec_model_path, local_files_only=True,
+                                                         attn_implementation="eager")
             audio_input_dim = 768 if opt.only_last_features else 12 * 768
         logger.debug(f"AudioEncoder: audio_input_dim set to {audio_input_dim}")
 

@@ -113,7 +113,8 @@ class LoadWav2VecModel:
 
         try:
             # Load configuration
-            config = AutoConfig.from_pretrained(model_path)
+            # Note: we need access to the attentions
+            config = AutoConfig.from_pretrained(model_path, attn_implementation="eager")
 
             # Instantiate YOUR FloatWav2VecModel with this config
             # Your FloatWav2VecModel.__init__(self, config) is used here.
