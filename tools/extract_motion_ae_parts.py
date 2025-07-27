@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # Gemini 2.5 Pro tool
 import torch
 import argparse

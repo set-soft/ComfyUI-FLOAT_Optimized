@@ -1,12 +1,26 @@
 [project]
 name = "float-optimized"
-description = "FLOAT Talking Portrait (image+audio to talking video) Optimize nodes. FLOAT is the Generative Motion Latent Flow Matching for Audio-driven Talking Portrait. It can animate an image using an audio. Nodes from simple to complex are provided. Optimized for low VRAM and supporting the use of one single file model. You can also experiment with very advanced nodes and dynamic emotions."
+description = """
+FLOAT Talking Portrait (image+audio to talking video) Optimize nodes.
+FLOAT is the Generative Motion Latent Flow Matching for Audio-driven Talking Portrait.
+It can animate an image using an audio. Nodes from simple to complex are provided.
+Optimized for low VRAM and supporting the use of one single file model.
+You can also experiment with very advanced nodes and dynamic emotions.
+"""
+# Inconsistent mechanism needed by comfy-cli, no dynamic variables
 version = "1.1.0"
+# Deprecated mechanism, comfy-cli doesn't support SPDX
 license = { file = "LICENSE.md" }
-dependencies = []
+# Not really used, ComfyUI-Manager doesn't use it
+# dependencies = ["seconohe>=1.0.2"]
+# So we do it in the reverse way ...
+dynamic = ["dependencies"]
 
 [project.urls]
 Repository = "https://github.com/set-soft/ComfyUI-FLOAT_Optimized"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [tool.comfy]
 PublisherId = "set-soft"

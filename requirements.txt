@@ -3,8 +3,8 @@ librosa
 torchdiffeq
 timm>=1.0.9
 huggingface_hub
-requests
 safetensors
 face_alignment
 transformers>=4
 tqdm
+seconohe>=1.0.2

@@ -8,16 +8,16 @@ from collections import OrderedDict
 import logging
 import re
 import os
+from seconohe.torch import get_torch_device_options, get_canonical_device
 import torch
 from typing import Dict
 # ComfyUI
 import comfy.utils
 import folder_paths
 
+from . import NODES_NAME
 from .options.base_options import BaseOptions
 from .utils.downloader import ensure_model_part_exists, look_for_models, look_for_model_dirs
-from .utils.misc import NODES_NAME
-from .utils.torch import get_torch_device_options
 from .models.misc import CHANNELS_MAP
 from .models.float.encoder import Encoder as FloatEncoderModule
 from .models.float.styledecoder import Synthesis as FloatSynthesisModule
@@ -67,8 +67,7 @@ class LoadWav2VecModel:
     @classmethod
     def INPUT_TYPES(cls):
         model_folders = look_for_model_dirs("audio", "wav2vec2-base-960h")
-        device_options = get_torch_device_options()
-        default_device = "cuda" if "cuda" in device_options else "cpu"
+        device_options, default_device = get_torch_device_options()
 
         return {
             "required": {
@@ -109,7 +108,7 @@ class LoadWav2VecModel:
         logger.info(f"Loading HF Wav2Vec weights from: {model_path} into FloatWav2VecModel, target device "
                     f"{target_device}")
 
-        device = torch.device(target_device)
+        device = get_canonical_device(target_device)
 
         try:
             # Load configuration
@@ -168,8 +167,7 @@ class LoadAudioProjectionLayer:
     @classmethod
     def INPUT_TYPES(cls):
         weight_files = look_for_models(PROJECTIONS_DIR, cls.DEFAULT_PROJECTION_FILENAME)
-        device_options = get_torch_device_options()
-        default_device = "cuda" if "cuda" in device_options else "cpu"
+        device_options, default_device = get_torch_device_options()
 
         return {
             "required": {
@@ -250,7 +248,7 @@ class LoadAudioProjectionLayer:
             logger.error(f"Error loading projection weights from {weights_path}: {e}")
             raise
 
-        projection_layer.target_device = torch.device(target_device)
+        projection_layer.target_device = get_canonical_device(target_device)
         logger.info(f"Audio projection layer loaded to {target_device} and set to eval mode.")
 
         projection_layer.inferred_input_feature_dim = inferred_input_feature_dim
@@ -269,8 +267,7 @@ class LoadEmotionRecognitionModel:
     @classmethod
     def INPUT_TYPES(cls):
         model_folders = look_for_model_dirs("audio", ESPR)
-        device_options = get_torch_device_options()
-        default_device = "cuda" if "cuda" in device_options else "cpu"
+        device_options, default_device = get_torch_device_options()
 
         return {
             "required": {
@@ -307,7 +304,7 @@ class LoadEmotionRecognitionModel:
             raise FileNotFoundError(f"Selected model folder not found: {model_path}")
 
         logger.info(f"Loading Emotion Recognition model from: {model_path} to device {target_device}")
-        device = torch.device(target_device)
+        device = get_canonical_device(target_device)
 
         try:
             config = AutoConfig.from_pretrained(model_path)
@@ -362,8 +359,7 @@ class LoadFloatEncoderModel:
     @classmethod
     def INPUT_TYPES(cls):
         weight_files = look_for_models(MOTION_AE_DIR, cls.DEFAULT_ENCODER_FILENAME)
-        device_options = get_torch_device_options()
-        default_device = "cuda" if "cuda" in device_options else "cpu"
+        device_options, default_device = get_torch_device_options()
 
         return {
             "required": {
@@ -471,7 +467,7 @@ class LoadFloatEncoderModel:
         encoder_model.dim_m = dim_m
         encoder_model.cudnn_benchmark_setting = cudnn_benchmark  # Store this setting
 
-        encoder_model.target_device = torch.device(target_device)
+        encoder_model.target_device = get_canonical_device(target_device)
         logger.info(f"FLOAT Encoder (inferred arch) loaded to {target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
 
         return (inferred_input_size, dim_w, dim_m, encoder_model)
@@ -498,8 +494,7 @@ class LoadFloatSynthesisModel:
     @classmethod
     def INPUT_TYPES(cls):
         weight_files = look_for_models(MOTION_AE_DIR, cls.DEFAULT_SYNTHESIS_FILENAME)
-        device_options = get_torch_device_options()
-        default_device = "cuda" if "cuda" in device_options else "cpu"
+        device_options, default_device = get_torch_device_options()
 
         # Defaults for required architectural choices not easily inferred
         from .options.base_options import BaseOptions  # For these defaults
@@ -651,7 +646,7 @@ class LoadFloatSynthesisModel:
         synthesis_model.blur_kernel_setting = blur_kernel
         synthesis_model.cudnn_benchmark_setting = cudnn_benchmark
 
-        synthesis_model.target_device = torch.device(target_device)
+        synthesis_model.target_device = get_canonical_device(target_device)
         logger.info(f"FLOAT Synthesis (inferred arch) loaded to {target_device}, eval mode. CUDNN bench: {cudnn_benchmark}")
 
         return (synthesis_model, inferred_size, inferred_style_dim, inferred_motion_dim)
@@ -670,8 +665,7 @@ class LoadFMTModel:
     @classmethod
     def INPUT_TYPES(cls):
         weight_files = look_for_models(FMT_SUBDIR, cls.DEFAULT_FMT_FILENAME)
-        device_options = get_torch_device_options()
-        default_device = "cuda" if "cuda" in device_options else "cpu"
+        device_options, default_device = get_torch_device_options()
 
         # Defaults for user inputs from BaseOptions
         base_opts = BaseOptions()
@@ -787,7 +781,7 @@ class LoadFMTModel:
         # --- 2. Prepare opt_for_fmt using inferred and input values ---
         opt_for_fmt = BaseOptions()  # Start with BaseOptions defaults
         # Override with inferred and direct input values (these are authoritative for structure)
-        opt_for_fmt.rank = torch.device(target_device)  # For mask creation device
+        opt_for_fmt.rank = get_canonical_device(target_device)  # For mask creation device
         opt_for_fmt.dim_h = inferred_dim_h
         opt_for_fmt.fmt_depth = inferred_fmt_depth
         opt_for_fmt.mlp_ratio = inferred_mlp_ratio

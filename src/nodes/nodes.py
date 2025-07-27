@@ -5,16 +5,16 @@
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
 import os
+from seconohe.downloader import download_file
+from seconohe.torch import get_torch_device_options, model_to_target, get_canonical_device
 import torch
 # ComfyUI
 import comfy.model_management as mm
 import folder_paths
 
 from .options.base_options import BaseOptions
-from .utils.downloader import download_model
-from .utils.logger import main_logger
-from .utils.misc import FLOAT_URL, FLOAT_UNIFIED_MODEL
-from .utils.torch import get_torch_device_options, model_to_target
+# We are the main source, so we use the main_logger
+from . import main_logger, FLOAT_URL, FLOAT_UNIFIED_MODEL
 from .generate import InferenceAgent
 
 EMOTIONS = ['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
@@ -23,8 +23,7 @@ EMOTIONS = ['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surp
 class LoadFloatModels:
     @classmethod
     def INPUT_TYPES(s):
-        device_options = get_torch_device_options()
-        default_device = "cuda" if "cuda" in device_options else "cpu"
+        device_options, default_device = get_torch_device_options()
 
         float_models_path = os.path.join(folder_paths.models_dir, "float")
         os.makedirs(float_models_path, exist_ok=True)
@@ -102,7 +101,7 @@ class LoadFloatModels:
             if not os.path.exists(ckpt_full_path):
                 main_logger.warning(f"Model file {ckpt_full_path} not found. Trying to download it...")
                 try:
-                    download_model(url=FLOAT_URL, save_dir=float_models_dir, file_name=FLOAT_UNIFIED_MODEL)
+                    download_file(main_logger, url=FLOAT_URL, save_dir=float_models_dir, file_name=FLOAT_UNIFIED_MODEL)
                 except Exception:
                     # The downloader already logs, but here we have a final message
                     main_logger.error(f"Failed to download {model}. Please download it manually.")
@@ -123,7 +122,7 @@ class LoadFloatModels:
                     main_logger.warning(f"opt_instance has no attribute '{key}' from advanced_float_options.")
 
         # Set core options
-        opt_instance.rank = torch.device(target_device)
+        opt_instance.rank = get_canonical_device(target_device)
         opt_instance.cudnn_benchmark = cudnn_benchmark
         opt_instance.ckpt_path = ckpt_full_path
         if not unified:
@@ -173,7 +172,7 @@ class FloatProcess:
 
         float_pipe.G.target_device = float_pipe.rank
         float_pipe.G.cudnn_benchmark_setting = float_pipe.opt.cudnn_benchmark_enabled
-        with model_to_target(float_pipe.G):
+        with model_to_target(main_logger, float_pipe.G):
             # original_fps = float_pipe.opt.fps
             float_pipe.opt.fps = fps
 

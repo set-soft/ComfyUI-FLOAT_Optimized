@@ -41,3 +41,18 @@ repos:
             # "--check-hidden"
         ]
         # You can create a .codespellignore file with one word per line for words to ignore.
+
+# --- Version checking ---
+-   repo: local
+    hooks:
+      - id: version-check
+        name: check for version consistency
+        # The command to execute. It's a Python script.
+        entry: python3 tools/check_versions.py
+        # Use 'system' to run it with the current environment's Python
+        language: system
+        # This hook doesn't need to run on every file.
+        # It should run if either of the version files change.
+        # This makes it very fast.
+        files: ^(pyproject\.toml|src/nodes/__init__\.py)$
+        # The regex `^...$` ensures it matches the full path from the repo root.

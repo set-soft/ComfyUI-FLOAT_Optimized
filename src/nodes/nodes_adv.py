@@ -9,6 +9,7 @@
 import logging
 import math
 import numpy as np
+from seconohe.torch import model_to_target
 import torch
 import torch.nn.functional as F
 from torchdiffeq import odeint
@@ -17,10 +18,9 @@ from typing import List, Dict  # , NewType
 # ComfyUI
 import comfy.utils
 
+from . import NODES_NAME, EMOTIONS, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .options.base_options import BaseOptions
 from .utils.image import img_tensor_2_np_array, process_img
-from .utils.torch import model_to_target
-from .utils.misc import EMOTIONS, NODES_NAME, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .generate import InferenceAgent
 from .models.float.FMT import FlowMatchingTransformer
 from .models.misc import CHANNELS_MAP
@@ -257,7 +257,7 @@ class FloatEncodeImageToLatents:
 
         agent.G.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
         agent.G.target_device = opt.rank
-        with model_to_target(agent.G):
+        with model_to_target(logger, agent.G):
             try:
                 # --- Progress Bar Handling for First Run of this specific component ---
                 if agent.G.first_run:
@@ -342,7 +342,7 @@ class FloatGetIdentityReference:
 
         agent.G.motion_autoencoder.dec.target_device = opt.rank
         agent.G.motion_autoencoder.dec.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
-        with model_to_target(agent.G.motion_autoencoder.dec):
+        with model_to_target(logger, agent.G.motion_autoencoder.dec):
             r_s_lambda_dev = r_s_lambda_latent.to(opt.rank)
 
             # --- Core Operation ---
@@ -435,7 +435,7 @@ class FloatEncodeAudioToLatentWA:
 
         agent.G.audio_encoder.target_device = opt.rank
         agent.G.audio_encoder.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
-        with model_to_target(agent.G.audio_encoder):
+        with model_to_target(logger, agent.G.audio_encoder):
             audio_on_device = processed_audio_features_batched_cpu.to(opt.rank)
 
             # Calculate Number of Frames based on the now uniform num_samples_after_prep
@@ -487,7 +487,7 @@ class FloatEncodeEmotionToLatentWE:
 
         agent.G.emotion_encoder.target_device = opt.rank
         agent.G.emotion_encoder.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
-        with model_to_target(agent.G.emotion_encoder):
+        with model_to_target(logger, agent.G.emotion_encoder):
             # emotion_encoder contains Wav2Vec2ForSpeechClassification model
             audio_on_device = processed_audio_features.to(opt.rank)
 
@@ -773,7 +773,7 @@ class FloatSampleMotionSequenceRD:
         logger.info(f"Calling ODE sampling loop for {batch_size} item(s).")
         fmt_model_to_use.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled  # Pass this for the helper's context manager
         fmt_model_to_use.target_device = target_device_for_sampling
-        with model_to_target(fmt_model_to_use):
+        with model_to_target(logger, fmt_model_to_use):
             r_d_latents_gpu = _perform_ode_sampling_loop(
                 fmt_model=fmt_model_to_use,
                 r_s_latent_dev=r_s_latent_dev,
@@ -868,7 +868,7 @@ class FloatDecodeLatentsToImages:
 
         agent.G.motion_autoencoder.dec.target_device = opt.rank
         agent.G.motion_autoencoder.dec.cudnn_benchmark_setting = opt.cudnn_benchmark_enabled
-        with model_to_target(agent.G.motion_autoencoder.dec):
+        with model_to_target(logger, agent.G.motion_autoencoder.dec):
             try:
                 s_r_dev = s_r_latent.to(opt.rank)
                 s_r_feats_dev_list = [feat.to(opt.rank) for feat in s_r_feats_list]

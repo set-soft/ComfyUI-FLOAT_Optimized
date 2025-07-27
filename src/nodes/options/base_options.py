@@ -4,7 +4,7 @@
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
 from dataclasses import dataclass
-from ..utils.misc import FLOAT_UNIFIED_MODEL
+from .. import FLOAT_UNIFIED_MODEL
 
 
 @dataclass

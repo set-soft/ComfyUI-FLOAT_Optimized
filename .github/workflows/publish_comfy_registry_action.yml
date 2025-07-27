@@ -2,10 +2,8 @@ name: Publish to Comfy registry
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - "pyproject.toml"
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'      # e.g. 1.2.3
 
 jobs:
   publish-node:
@@ -14,6 +12,7 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+
       - name: Publish Custom Node
         uses: Comfy-Org/publish-node-action@main
         with:

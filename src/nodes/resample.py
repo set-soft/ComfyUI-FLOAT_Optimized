@@ -10,7 +10,7 @@ import librosa
 import logging
 import numpy as np
 import torch
-from .utils.misc import NODES_NAME
+from . import NODES_NAME
 
 logger = logging.getLogger(f"{NODES_NAME}.resample")
 

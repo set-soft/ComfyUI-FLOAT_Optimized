@@ -5,6 +5,7 @@
 # Project: ComfyUI-Float_Optimized
 import logging
 import math
+from seconohe.torch import model_to_target
 import torch
 import torch.nn.functional as F
 # from tqdm import tqdm
@@ -12,9 +13,8 @@ from typing import Dict
 # ComfyUI
 import comfy.utils
 
+from . import NODES_NAME, EMOTIONS, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .options.base_options import BaseOptions
-from .utils.torch import model_to_target
-from .utils.misc import EMOTIONS, NODES_NAME, TORCHDIFFEQ_FIXED_STEP_SOLVERS
 from .models.float.encoder import Encoder as FloatEncoderModule
 from .models.float.styledecoder import Synthesis as FloatSynthesisModule
 from .models.float.FMT import FlowMatchingTransformer
@@ -104,7 +104,7 @@ class FloatAudioPreprocessAndFeatureExtract:
         # --- Inference using FloatWav2VecModel instance ---
         # Its forward(self, input_values, seq_len, ...) handles interpolation.
         wav2vec_features_gpu = None
-        with model_to_target(float_wav2vec_model_instance):
+        with model_to_target(logger, float_wav2vec_model_instance):
             # Call custom model's forward method.
             # The original AudioEncoder's get_wav2vec2_feature does:
             #   a = self.wav2vec2(a, seq_len=seq_len, output_hidden_states=not self.only_last_features)
@@ -189,7 +189,7 @@ class FloatApplyAudioProjection:
 
         # The projection layer expects (B, T, D_in) or (N, D_in) and processes the last dimension.
         # If features are (B, T, D_in), Linear layer will operate on D_in.
-        with model_to_target(projection_layer):
+        with model_to_target(logger, projection_layer):
             wa_latent_gpu = projection_layer(features_on_device)  # (B, NumFrames, D_target_w)
 
         logger.info(f"Output wa_latent shape: {wa_latent_gpu.shape}")
@@ -272,7 +272,7 @@ class FloatExtractEmotionWithCustomModel:
             logger.warning("label2id map not available in loaded emotion model config. Cannot use specified emotion "
                            f"'{selected_emotion_lower}'. Predicting from audio.")
 
-        with model_to_target(emotion_model):
+        with model_to_target(logger, emotion_model):
             # Predict if "none" or if specified emotion is not valid/mappable
             if selected_emotion_lower == "none" or emo_idx is None:
                 if selected_emotion_lower != "none" and emo_idx is None:  # Tried to specify but failed
@@ -344,7 +344,7 @@ class ApplyFloatEncoder:
 
         local_comfy_pbar = None  # No pbar for this apply node for now
 
-        with model_to_target(float_encoder):
+        with model_to_target(logger, float_encoder):
             s_for_encoder = ref_image.permute(0, 3, 1, 2).contiguous()
             s_for_encoder = (s_for_encoder * 2.0) - 1.0
             s_for_encoder = s_for_encoder.to(encoder_device)
@@ -434,7 +434,7 @@ class ApplyFloatSynthesis:
 
         comfy_pbar_decode = comfy.utils.ProgressBar(num_frames_to_decode * batch_size)
 
-        with model_to_target(float_synthesis):
+        with model_to_target(logger, float_synthesis):
             s_r_dev = s_r_latent.to(synthesis_device)
             s_r_feats_dev_list = [feat.to(synthesis_device) for feat in s_r_feats_list]
             r_d_dev = r_d_latents.to(synthesis_device)
@@ -517,7 +517,7 @@ class FloatGetIdentityReferenceVA:
                              f"got {r_s_lambda_latent.shape[1]}.")
 
         # Ensure model is on the correct device for THIS operation
-        with model_to_target(synthesis_module):
+        with model_to_target(logger, synthesis_module):
             r_s_lambda_dev = r_s_lambda_latent.to(synthesis_device)
 
             # --- Core Operation ---
@@ -694,7 +694,7 @@ class FloatSampleMotionSequenceRD_VA:  # Changed class name slightly
         we_latent_dev = we_latent.to(target_device_for_sampling)
 
         logger.info(f"Calling ODE sampling loop for VA node, {batch_size} item(s).")
-        with model_to_target(float_fmt_model):
+        with model_to_target(logger, float_fmt_model):
             try:
                 r_d_latents_gpu = _perform_ode_sampling_loop(
                     fmt_model=float_fmt_model,  # Pass the loaded model
@@ -804,7 +804,7 @@ class FloatExtractEmotionWithCustomModelDyn:
         logger.info(f"Predicting emotion over {num_chunks} audio chunks of ~{chunk_duration_sec:.2f}s each.")
 
         emotion_vectors_per_chunk = []
-        with model_to_target(emotion_model):
+        with model_to_target(logger, emotion_model):
             pbar = comfy.utils.ProgressBar(num_chunks * batch_size)
             for b_idx in range(batch_size):
                 waveform_item = input_waveform_batch[b_idx].squeeze(0)  # Get (S,) tensor

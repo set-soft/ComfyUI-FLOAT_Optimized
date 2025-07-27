@@ -1,10 +1,15 @@
 # Copyright (c) 2025 Salvador E. Tropea
-# Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
+# Copyright (c) 2025 Instituto Nacional de Tecnología Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
+from seconohe.logger import initialize_logger
 
+
+__version__ = "1.1.0"
+__copyright__ = "Copyright © 2025 Salvador E. Tropea / Instituto Nacional de Tecnología Industrial"
+__license__ = "License CC BY-NC-SA 4.0"
+__author__ = "Salvador E. Tropea"
 NODES_NAME = "FLOAT_Optimized"
-NODES_DEBUG_VAR = NODES_NAME.upper() + "_NODES_DEBUG"
 EMOTIONS = ['none', 'angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 # List of fixed-step solvers you from torchdiffeq
 TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
@@ -18,3 +23,5 @@ TORCHDIFFEQ_FIXED_STEP_SOLVERS = [
 ]
 FLOAT_URL = "https://huggingface.co/set-soft/float/resolve/main/FLOAT.safetensors?download=true"
 FLOAT_UNIFIED_MODEL = "FLOAT.safetensors"
+
+main_logger = initialize_logger(NODES_NAME)

@@ -4,38 +4,18 @@
 # Copyright (c) 2025 Instituto Nacional de Tecnologïa Industrial
 # License: CC BY-NC-SA 4.0
 # Project: ComfyUI-Float_Optimized
-from . import nodes
-from . import nodes_adv
-from . import nodes_vadv
-from . import nodes_vadv_loader
-import inspect
-import logging
-from .utils.misc import NODES_NAME
-
-init_logger = logging.getLogger(f"{NODES_NAME}.__init__")
-
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
+from .src.nodes import nodes, main_logger, __version__
+from .src.nodes import nodes_adv
+from .src.nodes import nodes_vadv
+from .src.nodes import nodes_vadv_loader
+from seconohe.register_nodes import register_nodes
+from seconohe import JS_PATH
 
 
-def register_nodes(module):
-    suffix = " " + module.SUFFIX if hasattr(module, "SUFFIX") else ""
-    if suffix:
-        suffix = " " + suffix
-    for name, obj in inspect.getmembers(module):
-        if not inspect.isclass(obj) or not hasattr(obj, "INPUT_TYPES"):
-            continue
-        assert hasattr(obj, "UNIQUE_NAME"), f"No name for {obj.__name__}"
-        NODE_CLASS_MAPPINGS[obj.UNIQUE_NAME] = obj
-        NODE_DISPLAY_NAME_MAPPINGS[obj.UNIQUE_NAME] = obj.DISPLAY_NAME + suffix
-
-
-register_nodes(nodes)
-register_nodes(nodes_adv)
-register_nodes(nodes_vadv)
-register_nodes(nodes_vadv_loader)
-
-init_logger.info(f"Registering {len(NODE_CLASS_MAPPINGS)} node(s).")
-init_logger.debug(f"{list(NODE_DISPLAY_NAME_MAPPINGS.values())}")
-
+NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS = register_nodes(
+    main_logger,
+    [nodes, nodes_adv, nodes_vadv, nodes_vadv_loader],
+    version=__version__
+)
+WEB_DIRECTORY = JS_PATH
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']

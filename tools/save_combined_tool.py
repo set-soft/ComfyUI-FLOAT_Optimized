@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Tool to create the unified safetensors file
 # Mostly Gemini 2.5 Pro code
 import torch
@@ -115,7 +116,7 @@ def create_and_save_combined_model(output_safetensors_path="combined_float_weigh
     print("Next steps:")
     print(f"1. Move '{output_safetensors_path}' to your 'ComfyUI/models/float/' directory.")
     print(f"2. Ensure 'config_wav2vec2_base.json', 'config_emotion_ser.json', and 'preprocessor_config_wav2vec2_base.json' "
-          f"are in your node's '{os.path.join(base_dir, 'model_configs')}/' directory.")
+          f"are in your node's '{os.path.join(base_dir, 'src', 'nodes', 'model_configs')}/' directory.")
     print("3. Update your node code (nodes.py, generate.py, etc.) to use these bundled files.")
 
 
