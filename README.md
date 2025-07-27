@@ -55,15 +55,18 @@ Note:
 ## &#x2600;&#xFE0F; Usage
 
 - Load [example workflow](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow.json)
+  Or you can use a version of the workflow that can download the example image and audio:
+  [quick example workflow](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow_quick.json)
+  Note that this version needs some extra nodes.
 - Upload driving image and audio, click queue.
   You can get the image originally used from [here](https://raw.githubusercontent.com/deepbrainai-research/float/refs/heads/main/assets/sam_altman_512x512.jpg),
   and the audio from [here](https://github.com/deepbrainai-research/float/raw/refs/heads/main/assets/aud-sample-vs-1.wav)
-- Models autodownload to `/ComfyUI/models/float`.
+- Models are automatically downloaded to `/ComfyUI/models/float`.
   But you can also download them manually.
 
 > [!IMPORTANT]
 > If models are automatically downloaded you'll see the workflow stopped at the "Load Float Models (Opt)" for a while.
-> Look into the ComfyUI console for more information.
+> The download progress will be displayed in the node and also in the console.
 > It will have to download 2.4 GB
 
 ### &#128190; Manual models download
