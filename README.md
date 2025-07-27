@@ -54,7 +54,7 @@ Note:
 
 ## &#x2600;&#xFE0F; Usage
 
-- Load [example workflow](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow.json)
+- Load [example workflow](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow.json)<br>
   Or you can use a version of the workflow that can download the example image and audio:
   [quick example workflow](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow_quick.json)
   Note that this version needs some extra nodes.
@@ -65,8 +65,8 @@ Note:
   But you can also download them manually.
 
 > [!IMPORTANT]
-> If models are automatically downloaded you'll see the workflow stopped at the "Load Float Models (Opt)" for a while.
-> The download progress will be displayed in the node and also in the console.
+> If models are automatically downloaded you'll see the workflow stopped at the "Load Float Models (Opt)" for a while.<br>
+> The download progress will be displayed in the node and also in the console.<br>
 > It will have to download 2.4 GB
 
 ### &#128190; Manual models download
