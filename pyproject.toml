@@ -25,3 +25,5 @@ dependencies = {file = ["requirements.txt"]}
 [tool.comfy]
 PublisherId = "set-soft"
 DisplayName = "FLOAT Optimized"
+Icon = "https://raw.githubusercontent.com/set-soft/ComfyUI-FLOAT_Optimized/main/assets/icon_400.jpg"
+Banner = "https://raw.githubusercontent.com/set-soft/ComfyUI-FLOAT_Optimized/main/assets/Banner_2.jpg"
