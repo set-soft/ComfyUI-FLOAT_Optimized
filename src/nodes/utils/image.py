@@ -132,12 +132,22 @@ def img_tensor_2_np_array(comfy_image_tensor: torch.Tensor, rgba_conversion: str
 
 
 @torch.no_grad()
-def process_img(img: np.ndarray, input_size: int, margin: float = 1.6) -> np.ndarray:
+def process_img(
+    img: np.ndarray,
+    input_size: int,
+    margin: float = 1.6,
+    index: int = 1
+) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+
     mult = 360. / img.shape[0]
 
     resized_img = cv2.resize(img, dsize=(0, 0), fx=mult, fy=mult, interpolation=cv2.INTER_AREA
                              if mult < 1. else cv2.INTER_CUBIC)
     bboxes = get_face_align().face_detector.detect_from_image(resized_img)
+    if bboxes:
+        # Filter boxes with high confidence level
+        bboxes = [(int(x1 / mult), int(y1 / mult), int(x2 / mult), int(y2 / mult), score)
+                  for (x1, y1, x2, y2, score) in bboxes if score > 0.95]
     if not bboxes:
         msg = "Failed to detect any face in the image, no face align performed"
         logger.warning(msg)
@@ -145,21 +155,27 @@ def process_img(img: np.ndarray, input_size: int, margin: float = 1.6) -> np.nda
         my = int(img.shape[0] / 2)
         mx = int(img.shape[1] / 2)
         bs = min(mx, my)
+        bbox_r = (mx - bs, my - bs, 2 * bs, 2 * bs)
     else:
-        bboxes = [(int(x1 / mult), int(y1 / mult), int(x2 / mult), int(y2 / mult), score)
-                  for (x1, y1, x2, y2, score) in bboxes if score > 0.95]
-        bboxes = bboxes[0]  # Just use first bbox
+        cant_bboxes = len(bboxes)
+        if index > cant_bboxes:
+            logger.warning(f"Only {cant_bboxes} detected, using the first one")
+            index = 1
 
-        bsy = int((bboxes[3] - bboxes[1]) / 2)
-        bsx = int((bboxes[2] - bboxes[0]) / 2)
-        my = int((bboxes[1] + bboxes[3]) / 2)
-        mx = int((bboxes[0] + bboxes[2]) / 2)
+        bbox = bboxes[index - 1]
+        logger.error(bbox)
+
+        bsy = int((bbox[3] - bbox[1]) / 2)
+        bsx = int((bbox[2] - bbox[0]) / 2)
+        my = int((bbox[1] + bbox[3]) / 2)
+        mx = int((bbox[0] + bbox[2]) / 2)
 
         bs = int(max(bsy, bsx) * margin)
         img = cv2.copyMakeBorder(img, bs, bs, bs, bs, cv2.BORDER_CONSTANT, value=0)
+        bbox_r = (mx - bs, my - bs, 2 * bs, 2 * bs)
         my, mx = my + bs, mx + bs      # BBox center y, bbox center x
 
     crop_img = img[my - bs:my + bs, mx - bs:mx + bs]
     crop_img = cv2.resize(crop_img, dsize=(input_size, input_size), interpolation=cv2.INTER_AREA
                           if mult < 1. else cv2.INTER_CUBIC)
-    return crop_img
+    return crop_img, bbox_r

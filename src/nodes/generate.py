@@ -75,7 +75,7 @@ class DataProcessor:
     def preprocess(self, ref_img: torch.Tensor, ref_audio: Dict, no_crop: bool) -> dict:
         s = img_tensor_2_np_array(ref_img, self.opt.rgba_conversion, self.opt.bkg_color_hex)
         if not no_crop:
-            s = process_img(s, self.input_size, self.opt.face_margin)
+            s, _ = process_img(s, self.input_size, self.opt.face_margin)
         s = self.transform(s).unsqueeze(0)
         a = self.default_aud_loader(ref_audio).unsqueeze(0)
         return {'s': s, 'a': a, 'p': None, 'e': None}

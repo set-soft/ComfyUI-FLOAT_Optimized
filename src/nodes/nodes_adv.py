@@ -50,12 +50,24 @@ class FloatImageFaceAlign:
 
         return {
             "required": {
-                "image": ("IMAGE",),
-                "face_margin": ("FLOAT", {"default": 1.6, "min": 1.2, "max": 2.0, "step": 0.1}),
-                "rgba_conversion": (RGBA_CONVERSION_STRATEGIES, {"default": "blend_with_color"}),
+                "image": ("IMAGE", {
+                    "tooltip": "Input image containing at least one face"
+                }),
+                "face_margin": ("FLOAT", {
+                    "default": 1.6,
+                    "min": 1.2,
+                    "max": 2.0,
+                    "step": 0.1,
+                    "tooltip": "Margin around the face, 1.6 means 60 % extra margin"
+                }),
+                "rgba_conversion": (RGBA_CONVERSION_STRATEGIES, {
+                    "default": "blend_with_color",
+                    "tooltip": "Strategy used to convert images with transparency"
+                }),
                 "bkg_color_hex": ("STRING", {
                     "default": "#000000",  # Black
                     # Only used for "blend_with_color" and "replace_with_color"
+                    "tooltip": "Color used for the 'blend_with_color' and 'replace_with_color' strategies"
                 }),
             },
             "optional": {
@@ -63,20 +75,27 @@ class FloatImageFaceAlign:
                     "default": default_size,
                     "min": min(practical_sizes) if practical_sizes else 64,
                     "max": max(practical_sizes) if practical_sizes else 1024,
-                    "step": 64  # A common step for power-of-2-like image sizes
+                    "step": 64,  # A common step for power-of-2-like image sizes
+                    "tooltip": "Size for the square containing the face"
+                }),
+                "index": ("INT", {
+                    "default": 1,
+                    "min": 1,
+                    "max": 14,
+                    "tooltip": "Which face to use when more than one is detected"
                 }),
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("IMAGE", "BBOX")
+    RETURN_NAMES = ("image", "bboxes")
     FUNCTION = "process"
     CATEGORY = BASE_CATEGORY
     DESCRIPTION = "Crops Crops to face, resizes, and handles RGBA to RGB conversion."
     UNIQUE_NAME = "FloatImageFaceAlign"
     DISPLAY_NAME = "Face Align for FLOAT"
 
-    def process(self, image, face_margin, rgba_conversion, bkg_color_hex, size=None):
+    def process(self, image, face_margin, rgba_conversion, bkg_color_hex, size=None, index=1):
         # Defensive, should be the default
         sz = size if size is not None else BaseOptions.input_size
         # Validate that the provided size is one of the valid ones from CHANNELS_MAP
@@ -98,12 +117,14 @@ class FloatImageFaceAlign:
 
         batch_size = image.shape[0]
         ret = torch.empty((batch_size, sz, sz, 3), dtype=torch.float32, device=image.device)
+        bboxes_list = []
         for b in range(batch_size):
             np_array_image = img_tensor_2_np_array(image[b], rgba_conversion, bkg_color_hex)
-            crop_image_np = process_img(np_array_image, sz, face_margin)
+            crop_image_np, bbox = process_img(np_array_image, sz, face_margin, index=index)
+            bboxes_list.append(bbox)
             ret[b] = torch.from_numpy(crop_image_np.astype(np.float32) / 255.0).to(image.device)
 
-        return (ret,)
+        return (ret, bboxes_list)
 
 
 class FloatAdvancedParameters:

@@ -27,8 +27,10 @@ This document provides a reference for the "Advanced" (Ad) nodes in the ComfyUI 
   - `rgba_conversion`: (Dropdown) The strategy to use when converting a 4-channel RGBA image to a 3-channel RGB image.
   - `bkg_color_hex`: (STRING) The background color (in hex format, e.g., `#000000`) to use for blending or replacement during RGBA conversion.
   - `size`: (INT, *Optional*) The target output size (height and width). If not connected, it uses the default size from the model's options (usually 512). Can be linked from a loader node's `inferred_input_size`.
+  - `index`: (INT, *Optional*) When more than one face is found which one to use. The first face is number 1.
 - **Outputs:**
   - `image`: (IMAGE) The processed image batch, cropped, resized, and ready for the FLOAT Encoder.
+  - `bboxes`: (BBOX) A list of bounding boxes for the detected face in each image of the input batch. Each bbox contains: X, Y, Width, Height. Note that `Width` and `Height` are the same, we use a square. Can be used to reinsert the face in the input image.
 
 ### `FloatAdvancedParameters`
 - **Display Name:** FLOAT Advanced Options (Ad)
