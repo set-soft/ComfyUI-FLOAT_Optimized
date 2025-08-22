@@ -10,6 +10,7 @@
 **Table of Contents**
 1. &#x0001F680; [Installation](#-installation)
 2. &#x2600;&#xFE0F; [Usage](#&#xFE0F;-usage)
+   - [More examples](#more-examples)
 3. &#128190; [Manual Models Download](#-manual-models-download)
    - [Simple](#simple)
    - [Flexible](#flexible)
@@ -68,6 +69,22 @@ Note:
 > If models are automatically downloaded you'll see the workflow stopped at the "Load Float Models (Opt)" for a while.<br>
 > The download progress will be displayed in the node and also in the console.<br>
 > It will have to download 2.4 GB
+
+### More examples
+
+In addition to the [main example](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow.json)
+you can also try:
+
+- [Quick](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_workflow_quick.json): A basic example that can download an image and audio example. The downloaded media is from the original paper.
+- [Advanced](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_adv.json): This example uses the *advanced* nodes. They show the architecture better. But I recommend using the *very advanced* nodes.
+- [Advanced (without comments)](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_adv_no_comments.json): This is the same as *Advanced* but without the notes.
+- [Very Advanced](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_very_advanced.json): This example uses the *very advanced* nodes. You can play with the inner details using it. I should also use less VRAM.
+- [Very Advanced (without comments)](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_very_advanced_no_comments.json): Same as *Very Advanced* but without the notes.
+- [Very Advanced Subgraphs](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_very_advanced_subgraphs.json): This is a *very advanced* version that uses subgraphs, so it can be seen as simple as the basic workflow, but you can go one level down and see it as the *advanced* version, and you can go deep to the *very advanced* level.
+- [Very Advanced Dynamic Emotion](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_va_dynamic_emo.json): An experimental workflow that uses the emotion as it changes during the audio clip, not just the emotion for the overall audio clip.
+- [Very Advanced Insert](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_very_advanced_sub_insert.json): Very advanced version that reinserts the generated animation in the original image, uses subgraphs
+- [Very Advanced Insert 2](https://github.com/set-soft/ComfyUI-FLOAT_Optimized/raw/refs/heads/master/example_workflows/float_very_advanced_sub_insert_2.json): Same as *Very Advanced Insert* but shows how to handle two faces.
+
 
 ### &#128190; Manual models download
 
