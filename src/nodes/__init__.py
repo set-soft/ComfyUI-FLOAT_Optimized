@@ -5,7 +5,7 @@
 from seconohe.logger import initialize_logger
 
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __copyright__ = "Copyright © 2025 Salvador E. Tropea / Instituto Nacional de Tecnología Industrial"
 __license__ = "License CC BY-NC-SA 4.0"
 __author__ = "Salvador E. Tropea"
