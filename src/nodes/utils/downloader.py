@@ -28,6 +28,7 @@ MODEL_PART_URLS = {
     "wav2vec2_base": "https://huggingface.co/facebook/wav2vec2-base-960h/resolve/main/model.safetensors",
     # The original emotion S.E.R. model is pytorch_model.bin.
     # We will save our extracted version as .safetensors for consistency.
+    # But if downloaded we keep its name.
     "emotion_ser": "https://huggingface.co/r-f/wav2vec-english-speech-emotion-recognition/resolve/main/pytorch_model.bin"
 }
 # Prefixes for extraction from the unified model
@@ -54,12 +55,20 @@ def ensure_model_part_exists(part_key: str, sub_dir: str, file_name: str, unifie
         node_root_path (str): The root path of the custom node package, to find tool scripts.
     """
     part_full_path = os.path.join(folder_paths.models_dir, sub_dir, file_name)
-
     if os.path.exists(part_full_path):
         logger.debug(f"Model part '{file_name}' already exists. Skipping.")
         return part_full_path
 
+    if file_name == 'model.safetensors':
+        # This is a generic name, we might have the pytorch_model.bin counterpart
+        file_name_bin = 'pytorch_model.bin'
+        part_full_path_bin = os.path.join(folder_paths.models_dir, sub_dir, file_name_bin)
+        if os.path.exists(part_full_path_bin):
+            logger.debug(f"Model part '{file_name_bin}' already exists. Skipping.")
+            return part_full_path_bin
+
     logger.warning(f"Model part not found at: {part_full_path}")
+    target_dir = os.path.dirname(part_full_path)
 
     # Step 1: Try to extract from the unified model if it exists
     if os.path.exists(unified_model_path):
@@ -67,10 +76,11 @@ def ensure_model_part_exists(part_key: str, sub_dir: str, file_name: str, unifie
 
         # Determine which extraction script to use
         if part_key in ["encoder", "decoder"]:
-            script_path = os.path.join(node_root_path, "tools", "extract_motion_ae_parts.py")
+            script_path = os.path.join(node_root_path, "..", "..", "tools", "extract_motion_ae_parts.py")
             cmd = [sys.executable, script_path, unified_model_path, part_full_path, part_key[:3]]
         elif part_key in EXTRACTION_PREFIXES:
-            script_path = os.path.join(node_root_path, "tools", "extract_wav2vec_parts.py")  # A more generic script
+            # A more generic script
+            script_path = os.path.join(node_root_path, "..", "..", "tools", "extract_wav2vec_parts.py")
             prefix = EXTRACTION_PREFIXES[part_key]
             cmd = [sys.executable, script_path, unified_model_path, part_full_path, prefix]
         else:
@@ -78,7 +88,6 @@ def ensure_model_part_exists(part_key: str, sub_dir: str, file_name: str, unifie
             return None
 
         try:
-            target_dir = os.path.dirname(part_full_path)
             # We must create the destination folder before calling the tool
             os.makedirs(target_dir, exist_ok=True)
             # Run the extraction script as a subprocess
@@ -103,12 +112,23 @@ def ensure_model_part_exists(part_key: str, sub_dir: str, file_name: str, unifie
         raise FileNotFoundError(f"Could not find or download required model part: {file_name}")
     part_url += "?download=true"
 
+    # The available file is an old PyTorch one
+    if part_key == "emotion_ser":
+        file_name = "pytorch_model.bin"
+        part_full_path = os.path.join(folder_paths.models_dir, sub_dir, file_name)
+
     try:
         # Use the existing downloader with UI progress bar
-        download_file(logger, url=part_url, save_dir=os.path.dirname(part_full_path), file_name=file_name)
+        download_file(logger, url=part_url, save_dir=target_dir, file_name=file_name)
     except Exception as e:
         logger.error(f"Direct download of '{file_name}' failed: {e}")
         raise  # Re-raise to stop execution and show error in UI.
+
+    # Copy any extra files
+    extra_files_path = os.path.join(node_root_path, "model_configs", part_key)
+    if os.path.isdir(extra_files_path):
+        shutil.copytree(extra_files_path, target_dir, dirs_exist_ok=True)
+
     return part_full_path
 
 
