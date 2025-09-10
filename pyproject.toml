@@ -8,7 +8,7 @@ Optimized for low VRAM and supporting the use of one single file model.
 You can also experiment with very advanced nodes and dynamic emotions.
 """
 # Inconsistent mechanism needed by comfy-cli, no dynamic variables
-version = "1.1.1"
+version = "1.1.2"
 # Deprecated mechanism, comfy-cli doesn't support SPDX
 license = { file = "LICENSE.md" }
 # Not really used, ComfyUI-Manager doesn't use it
@@ -25,5 +25,5 @@ dependencies = {file = ["requirements.txt"]}
 [tool.comfy]
 PublisherId = "set-soft"
 DisplayName = "FLOAT Optimized"
-Icon = "https://raw.githubusercontent.com/set-soft/ComfyUI-FLOAT_Optimized/main/assets/icon_400.jpg"
-Banner = "https://raw.githubusercontent.com/set-soft/ComfyUI-FLOAT_Optimized/main/assets/Banner_2.jpg"
+Icon = "https://raw.githubusercontent.com/set-soft/ComfyUI-FLOAT_Optimized/refs/heads/master/assets/icon_400.jpg"
+Banner = "https://raw.githubusercontent.com/set-soft/ComfyUI-FLOAT_Optimized/refs/heads/master/assets/Banner_2.jpg"
