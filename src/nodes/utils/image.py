@@ -163,7 +163,6 @@ def process_img(
             index = 1
 
         bbox = bboxes[index - 1]
-        logger.error(bbox)
 
         bsy = int((bbox[3] - bbox[1]) / 2)
         bsx = int((bbox[2] - bbox[0]) / 2)
